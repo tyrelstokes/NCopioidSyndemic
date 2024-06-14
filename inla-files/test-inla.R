@@ -253,7 +253,7 @@ m3 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
                    f(id_cs_i,EI1,copy = "id_cs_t",group = yi, hyper = hyper_copy)+
                    f(id_cs_d,ED1,copy = "id_cs_t",group = yd, hyper = hyper_copy)+
                    f(id_cs_c,EC1,copy = "id_cs_t",group = yc, hyper = hyper_copy)+
-                   f(id_cs_d,ED1,copy = "id_cs_t",group = yd, hyper = hyper_copy)+
+                   f(id_cs_b,EB1,copy = "id_cs_t",group = yb, hyper = hyper_copy)+
                    
                    f(idt,ET1,model="bym",
                     graph=adj.mat, scale.model=TRUE,
