@@ -169,6 +169,21 @@ id2[(n+1):(2*n)] <- adj_id
 id2[1:n] <- rep(NA,n)
 
 
+
+y1 <- vector(length = n*np)
+y2 <- vector(length = n*np)
+
+
+
+
+####
+
+
+
+
+
+
+
 m1 <- INLA::inla(y ~ -1+ int1 + int2 + f(id1,ET1,model="bym",
                          graph=adj.mat, scale.model=TRUE,
                          hyper = hlist)+

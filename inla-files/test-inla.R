@@ -18,8 +18,11 @@ h.spec <- list(prec = list(prior = 'pc.cor0', param = c(0.03, 0.03)))
 hlist <- list(prec.unstruct=list(prior="loggamma",param=c(1,0.001)), 
               prec.spatial=list(prior="loggamma",param=c(1,0.001)))
 
-m1 <- INLA::inla(y.T ~ f(id,ET,model="bym",
-                         graph=adj.mat, scale.model=TRUE,
+m1 <- INLA::inla(y.T ~ f(id,
+                         ET,
+                         model="bym",
+                         graph=adj.mat,
+                         scale.model=TRUE,
                          hyper = hlist,
                          group = year,
                          control.group = list(model = 'iid', hyper = h.spec,
@@ -44,7 +47,7 @@ pred_df <- data.frame(preds = preds, y = y.T)
 # Try with multiple likelihoods -------
 
 # Set some of the parameters
-np <- 2
+np <- 2 # dimension of the outcome
 n <- nrow(outcomedataNC)
 
 
@@ -101,14 +104,14 @@ y2 <- year_list$year_2
 
 # Set the prior for the time dimension
 
-h.spec <- list(rho = list(prior = 'pc.cor0', param = c(0.03, 0.03)))
+h.spec <- list(rho = list(prior = 'pc.cor0', param = c(0.5, 0.5)))
 
 
 # Model Code
 
 
 
-m1 <- INLA::inla(y ~ -1+ int1 + int2 + f(id1,ET1,model="bym",
+m2 <- INLA::inla(y ~ -1+ int1 + int2 + f(id1,ET1,model="bym",
                                          graph=adj.mat, scale.model=TRUE,
                                          hyper = hlist,
                                          group = y1,
@@ -130,14 +133,15 @@ m1 <- INLA::inla(y ~ -1+ int1 + int2 + f(id1,ET1,model="bym",
                            int1 = int1,
                            int2 = int2,
                            id1 = id1,
-                           id2 = id2),
+                           id2 = id2,
+                           id3 = id3),
                  control.compute=list(waic=TRUE),
                  control.predictor = list(compute = TRUE,
                                           link =1))
 
 
 
-summary(m1)
+summary(m2)
 
 
 # Extend to 6 outcomes ----------------
@@ -239,13 +243,21 @@ yb <- year_list$year_6
 
 # Run the model
 
-hyper_copy <- list(beta = list(prior = 'normal', param = c(0, 10)))
+hyper_copy <- list(beta = list(prior = 'normal', param = c(0.5,.1 )))
+h.spec <- list(rho = list(prior = 'pc.cor0', param = c(0.5, 0.8)))
+
+hlist3 <- list(theta1=list(prior="pc.prec",param=c(0.5,0.01)), 
+              theta2=list(prior="pc.prec",param=c(0.5,0.5)))
+
+hlist2 <- list(prec=list(prior="pc.prec",param=c(0.5,0.5)))
 
 m3 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
-                   f(id_cs_t,ET1,model="bym",
-                    graph=adj.mat, scale.model=TRUE,
-                    hyper = hlist,
+                   f(id_cs_t,ET1,model="bym2",
+                    graph=adj.mat, 
+                   # scale.model=TRUE,
+                    hyper = hlist3,
                     group = yt,
+                    constr = TRUE,
                     control.group = list(model = 'ar1', hyper = h.spec,
                                          scale.model = TRUE))+
                    
@@ -255,25 +267,31 @@ m3 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
                    f(id_cs_c,EC1,copy = "id_cs_t",group = yc, hyper = hyper_copy)+
                    f(id_cs_b,EB1,copy = "id_cs_t",group = yb, hyper = hyper_copy)+
                    
-                   f(idt,ET1,model="bym",
-                    graph=adj.mat, scale.model=TRUE,
-                    hyper = hlist,
-                    group = yt,
+                   f(id_ct_b,EB1,model="bym2",
+                    graph=adj.mat,
+                    hyper = hlist3,
+                   # scale.model=TRUE,
+                    group = yb,
+                    constr = TRUE,
                     control.group = list(model = 'ar1', hyper = h.spec,
                                          scale.model = TRUE))+
                    
-                    f(id_ct_b,EB1,copy = "idt",group = yb, hyper = hyper_copy)+
-                   f(idd,ED1,model="bym",
-                    graph=adj.mat, scale.model=TRUE,
-                    hyper = hlist,
+                    f(idt,ET1,copy = "id_ct_b",group = yt, hyper = hyper_copy)+
+                   f(idd,ED1,model="bym2",
+                    graph=adj.mat,
+                    hyper = hlist3,
                     group = yd,
+                   # scale.model=TRUE,
+                    constr = TRUE,
                     control.group = list(model = 'ar1', hyper = h.spec,
                          scale.model = TRUE))+
                      f(id_cd_e,EE1,copy = "idd",group = ye, hyper = hyper_copy)+
-                   f(idc,EC1,model="bym",
-                     graph=adj.mat, scale.model=TRUE,
-                     hyper = hlist,
+                   f(idc,EC1,model="bym2",
+                     graph=adj.mat,
+                     hyper = hlist3,
                      group = yc,
+                    # scale.model=TRUE,
+                     constr = TRUE,
                      control.group = list(model = 'ar1', hyper = h.spec,
                                           scale.model = TRUE))+
                   f(id_cc_i,EI1,copy = "idc",group = yi, hyper = hyper_copy),
@@ -318,3 +336,89 @@ m3 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
 
 
 summary(m3)
+
+
+## Besag version -------------
+
+m4 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
+                   f(id_cs_t,ET1,model="besag",
+                     graph=adj.mat,
+                     scale.model=TRUE,
+                    # hyper = hlist3,
+                     group = yt,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   
+                   f(id_cs_e,EE1,copy = "id_cs_t",group = ye, hyper = hyper_copy) +
+                   f(id_cs_i,EI1,copy = "id_cs_t",group = yi, hyper = hyper_copy)+
+                   f(id_cs_d,ED1,copy = "id_cs_t",group = yd, hyper = hyper_copy)+
+                   f(id_cs_c,EC1,copy = "id_cs_t",group = yc, hyper = hyper_copy)+
+                   f(id_cs_b,EB1,copy = "id_cs_t",group = yb, hyper = hyper_copy)+
+                   
+                   f(id_ct_b,EB1,model="besag",
+                     graph=adj.mat,
+                     scale.model=TRUE,
+                    # hyper = hlist3,
+                     group = yb,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   
+                   f(idt,ET1,copy = "id_ct_b",group = yt, hyper = hyper_copy)+
+                   f(idd,ED1,model="besag",
+                     scale.model=TRUE,
+                     graph=adj.mat,
+                     #hyper = hlist3,
+                     group = yd,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   f(id_cd_e,EE1,copy = "idd",group = ye, hyper = hyper_copy)+
+                   f(idc,EC1,model="besag",
+                     graph=adj.mat,
+                     scale.model=TRUE,
+                    # hyper = hlist3,
+                     group = yc,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   f(id_cc_i,EI1,copy = "idc",group = yi, hyper = hyper_copy),
+                 family=c("poisson",
+                          "poisson",
+                          "poisson",
+                          "poisson",
+                          "poisson",
+                          "poisson"),
+                 data=list(y =y,
+                           EE1 = EE1,
+                           ET1 = ET1,
+                           EB1 = EB1,
+                           EC1 = EC1,
+                           ED1 = ED1,
+                           EI1 = EI1,
+                           int1 = int1,
+                           int2 = int2,
+                           int3 = int3,
+                           int4 = int4,
+                           int5 = int5,
+                           int6 = int6,
+                           idt = idt,
+                           ide = ide,
+                           idi =idi,
+                           idd =idd,
+                           idc =idc,
+                           idb =idb,
+                           id_cs_t =id_cs_t,
+                           id_cs_e = id_cs_e,
+                           id_cs_i = id_cs_i,
+                           id_cs_d = id_cs_d,
+                           id_cs_c = id_cs_c,
+                           id_cs_b = id_cs_b,
+                           id_ct_b = id_ct_b,
+                           id_cd_e = id_cd_e,
+                           id_cc_i = id_cc_i),
+                 control.compute=list(waic=TRUE),
+                 control.predictor = list(compute = TRUE,
+                                          link =1),
+                 verbose = FALSE)
+
+
+summary(m4)
+

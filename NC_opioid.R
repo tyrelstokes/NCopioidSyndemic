@@ -323,3 +323,6 @@ save(samples_randomLQ,file="ModOutput.Rda")
 quit()
 
 
+nc$adj <- adj
+
+
