@@ -19,7 +19,6 @@ hlist <- list(prec.unstruct=list(prior="loggamma",param=c(1,0.001)),
               prec.spatial=list(prior="loggamma",param=c(1,0.001)))
 
 m1 <- INLA::inla(y.T ~ f(id,
-                         ET,
                          model="bym",
                          graph=adj.mat,
                          scale.model=TRUE,
@@ -27,6 +26,7 @@ m1 <- INLA::inla(y.T ~ f(id,
                          group = year,
                          control.group = list(model = 'iid', hyper = h.spec,
                                               scale.model = TRUE)),
+                 E = ET,
                  family="poisson",
                  data=ldf,
                  control.compute=list(waic=TRUE),
@@ -421,4 +421,93 @@ m4 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
 
 
 summary(m4)
+
+
+## censored version
+
+m5 <- INLA::inla(y ~ -1+ int1 + int2 + int3 + int4 + int5 + int6+
+                   f(id_cs_t,ET1,model="bym2",
+                     graph=adj.mat, 
+                     # scale.model=TRUE,
+                     hyper = hlist3,
+                     group = yt,
+                     constr = TRUE,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   
+                   f(id_cs_e,EE1,copy = "id_cs_t",group = ye, hyper = hyper_copy) +
+                   f(id_cs_i,EI1,copy = "id_cs_t",group = yi, hyper = hyper_copy)+
+                   f(id_cs_d,ED1,copy = "id_cs_t",group = yd, hyper = hyper_copy)+
+                   f(id_cs_c,EC1,copy = "id_cs_t",group = yc, hyper = hyper_copy)+
+                   f(id_cs_b,EB1,copy = "id_cs_t",group = yb, hyper = hyper_copy)+
+                   
+                   f(id_ct_b,EB1,model="bym2",
+                     graph=adj.mat,
+                     hyper = hlist3,
+                     # scale.model=TRUE,
+                     group = yb,
+                     constr = TRUE,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   
+                   f(idt,ET1,copy = "id_ct_b",group = yt, hyper = hyper_copy)+
+                   f(idd,ED1,model="bym2",
+                     graph=adj.mat,
+                     hyper = hlist3,
+                     group = yd,
+                     # scale.model=TRUE,
+                     constr = TRUE,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   f(id_cd_e,EE1,copy = "idd",group = ye, hyper = hyper_copy)+
+                   f(idc,EC1,model="bym2",
+                     graph=adj.mat,
+                     hyper = hlist3,
+                     group = yc,
+                     # scale.model=TRUE,
+                     constr = TRUE,
+                     control.group = list(model = 'ar1', hyper = h.spec,
+                                          scale.model = TRUE))+
+                   f(id_cc_i,EI1,copy = "idc",group = yi, hyper = hyper_copy),
+                 family=c("poisson",
+                          "poisson",
+                          "poisson",
+                          "poisson",
+                          "poisson",
+                          "poisson"),
+                 data=list(y =y,
+                           EE1 = EE1,
+                           ET1 = ET1,
+                           EB1 = EB1,
+                           EC1 = EC1,
+                           ED1 = ED1,
+                           EI1 = EI1,
+                           int1 = int1,
+                           int2 = int2,
+                           int3 = int3,
+                           int4 = int4,
+                           int5 = int5,
+                           int6 = int6,
+                           idt = idt,
+                           ide = ide,
+                           idi =idi,
+                           idd =idd,
+                           idc =idc,
+                           idb =idb,
+                           id_cs_t =id_cs_t,
+                           id_cs_e = id_cs_e,
+                           id_cs_i = id_cs_i,
+                           id_cs_d = id_cs_d,
+                           id_cs_c = id_cs_c,
+                           id_cs_b = id_cs_b,
+                           id_ct_b = id_ct_b,
+                           id_cd_e = id_cd_e,
+                           id_cc_i = id_cc_i),
+                 control.compute=list(waic=TRUE),
+                 control.predictor = list(compute = TRUE,
+                                          link =1),
+                 verbose = FALSE)
+
+
+summary(m3)
 
