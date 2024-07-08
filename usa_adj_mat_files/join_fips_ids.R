@@ -25,5 +25,9 @@ write.csv(fips_dt,here::here("usa_adj_mat_files/fips.csv"))
 
 # join on adj_mat --------
 
+adj_mat$county_id <- plyr::mapvalues(adj_mat$X,
+                                     from = fips_dt$full_name,
+                                     to = fips_dt$fips_num)
 
 
+write.csv(adj_mat,here::here("usa_adj_mat_files/aug_adj_mat.csv"))
