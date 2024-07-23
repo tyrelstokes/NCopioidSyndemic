@@ -157,7 +157,7 @@ if(spatial == T){
       E3,
       copy = 'id1',
       group = m3,
-      hyper = list(beta = beta.prior)+", sep = "")
+      hyper = list(beta = beta.prior))+", sep = "")
   
   form <- stringr::str_remove_all(form,"\\n")
 
@@ -179,7 +179,7 @@ if(spatial == T){
       E3,
       copy = 'id1',
       group = m3,
-      hyper = list(beta = beta.prior)+", sep = "")
+      hyper = list(beta = beta.prior))+", sep = "")
     
     form <- stringr::str_remove_all(form,"\\n") 
   }

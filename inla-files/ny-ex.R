@@ -257,7 +257,7 @@ test_model <- INLA::inla(y ~ -1+ int1 + int2 +int3+
                              group = m1,
                              scale.model=TRUE,
                              adjust.for.con.comp = TRUE,
-                             control.group = list(model = 'rw1',
+                             control.group = list(model = 'rw2',
                                                   hyper = hyper.prec,
                                                   scale.model = TRUE),
                              initial = 3)+
@@ -292,9 +292,6 @@ test_model <- INLA::inla(y ~ -1+ int1 + int2 +int3+
                                    id_slm1 = id_slm1,
                                    id_slm2 = id_slm2,
                                    id_slm3 = id_slm3,
-                                   l1 = l1,
-                                   l2 = l2,
-                                   l3 = l3,
                                    mar1 = mar1,
                                    mar2 = mar2,
                                    mar3 = mar3,

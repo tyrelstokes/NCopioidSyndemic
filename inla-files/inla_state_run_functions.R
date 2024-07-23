@@ -28,12 +28,14 @@ inla_run_county <- function(state_df,
                             jhu_zeros = T,
                             beta.prior = beta.prior,
                             hyper.prec = hyper.prec,
-                            prec_fixed = 1){
+                            prec_fixed = 1,
+                            run = T){
   
   
-  county <- state_df%>% dplyr::filter(county_fips_code == county_fips)
+  df <- state_df%>% dplyr::filter(county_fips_code == county_fips)
+  n <- nrow(df)
   
-  
+  if(run == TRUE){
   if(jhu_zeros == T){
     np <- 3
     outcome_list <- list(df$cases,
@@ -86,8 +88,8 @@ inla_run_county <- function(state_df,
   
   if(np == 2){
     
-    link_set <- c(rep(1,nrow(er)),
-                  rep(2,nrow(er)))
+    link_set <- c(rep(1,nrow(df)),
+                  rep(2,nrow(df)))
     
     
     # name the appropriate vectors
@@ -113,8 +115,8 @@ inla_run_county <- function(state_df,
     #####################
     
     ######################
-    march_list <-  time_lists[[1]]
-    vac_list <- time_lists[[2]]
+    march_list <-  time_list[[1]]
+    vac_list <- time_list[[2]]
     
     #######################
     mar1 <- march_list[[1]]
@@ -172,9 +174,9 @@ inla_run_county <- function(state_df,
   }else{
     
     
-    link_set <- c(rep(1,nrow(er)),
-                  rep(2,nrow(er)),
-                  rep(3,nrow(er)))
+    link_set <- c(rep(1,nrow(df)),
+                  rep(2,nrow(df)),
+                  rep(3,nrow(df)))
   
     
     # name the appropriate vectors
@@ -204,8 +206,8 @@ inla_run_county <- function(state_df,
     #####################
     
     ######################
-   march_list <-  time_lists[[1]]
-   vac_list <- time_lists[[2]]
+   march_list <-  time_list[[1]]
+   vac_list <- time_list[[2]]
    
    #######################
    mar1 <- march_list[[1]]
@@ -224,7 +226,7 @@ inla_run_county <- function(state_df,
                              vac1 + vac2 + vac3+
                              f(m1,
                                model= "ar",
-                               order = order,
+                               order = ar_order,
                                adjust.for.con.comp = TRUE,
                                hyper = hyper.prec)+
                              f(m2,
@@ -272,10 +274,18 @@ inla_run_county <- function(state_df,
 
     
   }
+ 
+  }else{
+    out <- list(df = df,
+                preds = NULL,
+                inla_mod = NULL)
+  }
   
  out <- list(df = df,
              preds = preds,
              inla_mod = test_mod)
+ 
+ out
   
 }
 
@@ -288,7 +298,7 @@ inla_run_state <- function(state_df,
                            spatial = T,
                            spatial_model = "'bym2'",
                            grouped_effect = T,
-                           grouped_type = "'ar2'",
+                           grouped_type = "'rw2'",
                            temporal_model = "no",
                            ar_order = 5,
                            time_intercepts = TRUE,
@@ -298,7 +308,11 @@ inla_run_state <- function(state_df,
                            prec_fixed = 1,
                            mar = T,
                            vac = T,
-                           late = T){
+                           late = T,
+                           run_inla = T,
+                           rm_nas = T,
+                           data_prep = T,
+                           imputed_outcome = F){
   
   
   
@@ -306,10 +320,14 @@ inla_run_state <- function(state_df,
   
   
   state_adj_list <-  state_adj_fun(usa_adj = usa_adj,
-                                state_abr = state_abr,
-                                fips = T) 
+                                   state_abr = state_abr,
+                                   fips = T) 
   
   adj.mat <- state_adj_list$state_mat
+  
+  
+  if(data_prep == T){
+
   
   # add remapped ids from 1:n_counties to the state data set ---------------
   state_df <- map_adj_ids(adj_list = state_adj_list,
@@ -327,17 +345,20 @@ inla_run_state <- function(state_df,
   state_df$population_scale <- state_df$population/(median(state_df$cases,na.rm = T)*50)
   
   
-  na_df <- state_df %>%
-    dplyr::group_by(case_month) %>%
-    dplyr::summarise(na_cases = mean(is.na(cases)),
-    na_jhu = mean(is.na(jhu_cases)))
+
   
   
+  if(rm_nas == T){
+    na_df <- state_df %>%
+      dplyr::group_by(case_month) %>%
+      dplyr::summarise(na_cases = mean(is.na(cases)),
+                       na_jhu = mean(is.na(jhu_cases)))
   nas <- which((na_df$na_cases == 1) & (na_df$na_jhu ==1))   
   
   state_df <- state_df %>% 
     dplyr::filter(!(case_month %in% na_df$case_month[nas]))
   
+  }
   
   state_df <- map_month_ids(df = state_df,
                       beg = NULL, # default beg and end will be first and last month respectively
@@ -345,7 +366,7 @@ inla_run_state <- function(state_df,
   
   
   # set the dimensions of the flattened data for inla transformation
-  n <- nrow(state_df)
+
   
   # artificially set the negative counts to 0 (Change this later) 
   
@@ -360,17 +381,29 @@ inla_run_state <- function(state_df,
   state_df  <- state_df %>% dplyr::mutate(case_na = ifelse(is.na(cases),1,0),
                               jhu_na = ifelse(is.na(jhu_cases),1,0))
   
+  
+  }
   state_df <- state_df %>% dplyr::arrange(case_na,
                               jhu_na,
                               county_fips_code)
+  
+  n <- nrow(state_df)
   
   #######################################3
   
   if(jhu_zeros == T){
     np <- 3
+    
+    if(imputed_outcome == F){
     outcome_list <- list(state_df$cases,
                          state_df$jhu_zero,
                          state_df$jhu_cases)
+    }else{
+      
+      outcome_list <- list(state_df$cdc_impute,
+                           state_df$jhu_zero,
+                           state_df$jhu_impute)
+    }
     
     offset_list <- rep_vector(np = np,
                               x = state_df$population_scale)
@@ -382,8 +415,13 @@ inla_run_state <- function(state_df,
                              x = state_df$month_id)
   }else{
     np <- 2
+    if(imputed_outcome == F){
     outcome_list <- list(state_df$cases,
                          state_df$jhu_cases)
+    }else{
+      outcome_list <- list(state_df$cdc_impute,
+                           state_df$jhu_impute)
+    }
     
     offset_list <- rep_vector(np = np,
                               x = state_df$population_scale)
@@ -445,9 +483,9 @@ inla_run_state <- function(state_df,
     #####################
     
     ######################
-    march_list <-  time_lists[[1]]
-    vac_list <- time_lists[[2]]
-    late_list <- time_lists[[3]]
+    march_list <-  time_list[[1]]
+    vac_list <- time_list[[2]]
+    late_list <- time_list[[3]]
     
     #######################
     mar1 <- march_list[[1]]
@@ -476,6 +514,7 @@ inla_run_state <- function(state_df,
                              late = late) 
     
     
+    if(run_inla == T){
     test_mod <- INLA::inla(inla_form,
                            family=c("poisson","zeroinflatedpoisson0"),
                            data=list(y =y,
@@ -500,13 +539,26 @@ inla_run_state <- function(state_df,
                            verbose = TRUE)
     
     
+    
     predictions <- inla_predict(inla_mod = test_mod,
                                 n = n,
                                 np = np,
                                 df = df)
     
+    
     df <- predictions$df
     preds <- predictions$preds
+    
+    }else{
+      
+      
+      
+      df <- state_df
+      preds <- NULL
+      test_mod <- NULL
+    }
+    
+ 
     
     
     
@@ -544,9 +596,9 @@ inla_run_state <- function(state_df,
     #####################
     
     ######################
-    march_list <-  time_lists[[1]]
-    vac_list <- time_lists[[2]]
-    late_list <- time_lists[[3]]
+    march_list <-  time_list[[1]]
+    vac_list <- time_list[[2]]
+    late_list <- time_list[[3]]
     
     #######################
     mar1 <- march_list[[1]]
@@ -577,8 +629,9 @@ inla_run_state <- function(state_df,
                               vac = vac,
                               late = late) 
     
+    #inla_form
     
-    
+    if(run_inla == TRUE){
     test_mod <- INLA::inla(inla_form,
                            family=c("poisson","binomial","zeroinflatedpoisson0"),
                            data=list(y =y,
@@ -599,7 +652,10 @@ inla_run_state <- function(state_df,
                                      vac3 = vac3,
                                      late1 = late1,
                                      late2 = late2,
-                                     late3 = late3),
+                                     late3 = late3,
+                                     m1 = m1,
+                                     m2 = m2,
+                                     m3 = m3),
                            control.compute=list(waic=TRUE),
                            control.predictor = list(compute = TRUE,
                                                     link = link_set),
@@ -617,7 +673,14 @@ inla_run_state <- function(state_df,
     df <- predictions$df
     preds <- predictions$preds
     
-    
+    }else{
+      
+      
+      
+      df <- state_df
+      preds <- NULL
+      test_mod <- NULL
+    }
     
   }
   
