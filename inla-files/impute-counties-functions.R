@@ -15,7 +15,8 @@ county_impute <- function(state_df,
                           prec_fixed = 1,
                           impute_month_vec = c(38:48),
                           outcomes = c("jhu_cases"),
-                          run = TRUE){
+                          run = TRUE,
+                          verbose = TRUE){
   
  
   
@@ -27,7 +28,8 @@ county_impute <- function(state_df,
                                 beta.prior = beta.prior,
                                 hyper.prec = hyper.prec,
                                 prec_fixed = prec_fixed,
-                                run = run) 
+                                run = run,
+                                verbose = verbose) 
   
   
   county_df <- county_model$df
@@ -75,13 +77,18 @@ county_impute_many <- function(state_df,
                           hyper.prec = hyper.prec,
                           prec_fixed = 1,
                           impute_month_vec = c(38:48),
-                          outcomes = c("jhu_cases")){
+                          outcomes = c("jhu_cases"),
+                          verbose = T){
   
  
   n_counties <- length(fips_vec)
   
-  counties <- foreach::foreach(i = 1:n_counties,.combine = rbind)%do%{
+  counties <- foreach::foreach(i = 1:n_counties,
+                               .combine = rbind,
+                               .errorhandling = "pass")%do%{
     
+    print(paste("Now imputing fips id:",fips_vec[i]))                           
+                                 
     county_impute(state_df = state_df,
                   fips = fips_vec[i],
                   ar_order = ar_order,
@@ -92,8 +99,10 @@ county_impute_many <- function(state_df,
                   prec_fixed = prec_fixed,
                   impute_month_vec = impute_month_vec,
                   outcomes = outcomes,
-                  run = TRUE) 
+                  run = TRUE,
+                  verbose = verbose) 
     
+   
     
   }
   
@@ -105,8 +114,8 @@ county_impute_many <- function(state_df,
   state_df$cdc_impute <- state_df$cases
   state_df$jhu_impute <- state_df$jhu_cases
   
-  state_df$cdc_impute[ind] <- counties$cdc_impute
-  state_df$jhu_impute[ind] <- counties$jhu_impute
+  state_df$cdc_impute[ind] <- round(counties$cdc_impute)
+  state_df$jhu_impute[ind] <- round(counties$jhu_impute)
  
  
   state_df
@@ -133,11 +142,9 @@ run_state_with_impute <- function(state_df,
                                   vac = T,
                                   late = T,
                                   impute_fips_vec,
-                                  ar_order = 5,
-                                  time_intercepts = TRUE,
-                                  jhu_zeros = T,
                                   impute_month_vec = c(38:48),
-                                  outcomes = c("jhu_cases","cases")){
+                                  outcomes = c("jhu_cases","cases"),
+                                  verbose = T){
   
   
   
@@ -162,7 +169,7 @@ run_state_with_impute <- function(state_df,
   state_df <- state_list$df
   
 state_df_impute <-   county_impute_many(state_df = state_df,
-                     fips_vec = fips_vec,
+                     fips_vec = impute_fips_vec,
                      ar_order = ar_order,
                      time_intercepts = time_intercepts,
                      jhu_zeros = jhu_zeros,
@@ -170,8 +177,11 @@ state_df_impute <-   county_impute_many(state_df = state_df,
                      hyper.prec = hyper.prec,
                      prec_fixed = prec_fixed,
                      impute_month_vec = impute_month_vec,
-                     outcomes = outcomes) 
+                     outcomes = outcomes,
+                     verbose = verbose) 
 
+
+print("Now running the full state model with imputed data")
 
 
 out_list <- inla_run_state(state_df = state_df_impute,
@@ -191,7 +201,11 @@ out_list <- inla_run_state(state_df = state_df_impute,
                              vac = vac,
                              late = late,
                              run_inla = T,
-                             data_prep = F) 
+                             data_prep = F,
+                             verbose = verbose,
+                            imputed_outcome = T) 
+
+out_list
   
 }
 

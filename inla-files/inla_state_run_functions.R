@@ -29,7 +29,8 @@ inla_run_county <- function(state_df,
                             beta.prior = beta.prior,
                             hyper.prec = hyper.prec,
                             prec_fixed = 1,
-                            run = T){
+                            run = T,
+                            verbose = T){
   
   
   df <- state_df%>% dplyr::filter(county_fips_code == county_fips)
@@ -158,7 +159,7 @@ inla_run_county <- function(state_df,
                            control.inla=list(cmin=0),
                            control.fixed = list(prec = prec_fixed),
                            safe = TRUE,
-                           verbose = TRUE)
+                           verbose = verbose)
     
     
     predictions <- inla_predict(inla_mod = test_mod,
@@ -260,7 +261,7 @@ inla_run_county <- function(state_df,
                            control.inla=list(cmin=0),
                            control.fixed = list(prec = prec_fixed),
                            safe = TRUE,
-                           verbose = TRUE)
+                           verbose = verbose)
    
    
    predictions <- inla_predict(inla_mod = test_mod,
@@ -312,7 +313,8 @@ inla_run_state <- function(state_df,
                            run_inla = T,
                            rm_nas = T,
                            data_prep = T,
-                           imputed_outcome = F){
+                           imputed_outcome = F,
+                           verbose = T){
   
   
   
@@ -515,7 +517,7 @@ inla_run_state <- function(state_df,
     
     
     if(run_inla == T){
-    test_mod <- INLA::inla(inla_form,
+    test_mod <- INLA::inla(as.formula(inla_form),
                            family=c("poisson","zeroinflatedpoisson0"),
                            data=list(y =y,
                                      E1 = E1,
@@ -536,7 +538,7 @@ inla_run_state <- function(state_df,
                            control.inla=list(cmin=0),
                            control.fixed = list(prec = prec_fixed),
                            safe = TRUE,
-                           verbose = TRUE)
+                           verbose = verbose)
     
     
     
@@ -632,9 +634,9 @@ inla_run_state <- function(state_df,
     #inla_form
     
     if(run_inla == TRUE){
-    test_mod <- INLA::inla(inla_form,
+    test_mod <- INLA::inla(as.formula(inla_form),
                            family=c("poisson","binomial","zeroinflatedpoisson0"),
-                           data=list(y =y,
+                           data=list(y =as.matrix(y),
                                      E1 = E1,
                                      E2 = E2,
                                      E3 = E3,
@@ -655,14 +657,15 @@ inla_run_state <- function(state_df,
                                      late3 = late3,
                                      m1 = m1,
                                      m2 = m2,
-                                     m3 = m3),
+                                     m3 = m3,
+                                     adj.mat = as.matrix(adj.mat)),
                            control.compute=list(waic=TRUE),
                            control.predictor = list(compute = TRUE,
                                                     link = link_set),
                            control.inla=list(cmin=0),
                            control.fixed = list(prec = prec_fixed),
                            safe = TRUE,
-                           verbose = TRUE)
+                           verbose = verbose)
     
     
     predictions <- inla_predict(inla_mod = test_mod,
