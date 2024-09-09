@@ -67,6 +67,8 @@ county_impute <- function(state_df,
 
 # impute many counties --------------
 
+# Note, it would be useful to be able to extend this so that we can impute different months
+# for different counties!!!!
 
 county_impute_many <- function(state_df,
                           fips_vec,

@@ -11,6 +11,22 @@ source(here::here("usa_adj_mat_files/adj-mat-functions.R"))
 source(here::here("utilities/date-functions.R"))
 library(INLA)
 
+# Notes
+# Add the confidence intervals to the output!!!
+# Think about areas where it is possible to extend the Dave and Staci framework!
+
+# y_cases = alpha_cases + S(X,T) + e_cases
+# y_hosp = alpha_hosp + B_hosp*S(X) + e_hosp
+# y_deaths = alpha_death + B_death*S(X) + e_death
+
+# [1, B_hosp, B_death] * S(X)
+
+#S(X)
+
+# f(S(X))
+
+# 
+
 
 # default priors -----------------------------------------
 U <- 1
