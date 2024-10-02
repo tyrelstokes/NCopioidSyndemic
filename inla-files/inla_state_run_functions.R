@@ -91,7 +91,8 @@ inla_run_county <- function(state_df,
                              offset_list = offset_list,
                              id_list = id_list,
                              month_list = month_list,
-                             extra_time_int = TRUE)
+                             extra_time_int = TRUE,
+                             month_list_lag = NULL)
   
   
  # extract the data 
@@ -101,7 +102,7 @@ inla_run_county <- function(state_df,
  month_list <- inla_lists$month_list
  offset_list <- inla_lists$offset_list
  time_list <- inla_lists$time_lists
- 
+ month_list_lag <- inla_lists$month_list_lag
   
   if(np == 2){
     

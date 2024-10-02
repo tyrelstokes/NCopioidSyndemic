@@ -138,7 +138,9 @@ inla_data_list <- function(df,
                            offset_list,
                            id_list,
                            month_list,
-                           extra_time_int = TRUE){
+                           extra_time_int = TRUE,
+                           outcome_inters = NULL,
+                           month_list_lag = NULL){
   
   
   # Create INLA outcome matrix for multidimensional modelling
@@ -181,7 +183,12 @@ inla_data_list <- function(df,
   
   # create time intercepts if desired
   
-  
+  if(is.null(month_list_lag)==FALSE){
+    month_list_lag <-  inla_vectors(n = n,
+                                    np = np,
+                                    x_list = month_list_lag,
+                                    base_name = "month_lag")
+  }
   
   
   
@@ -202,7 +209,8 @@ inla_data_list <- function(df,
               month_list = month_list,
               offset_list = offset_list,
               id_list = id_list,
-              time_lists = time_lists)
+              time_lists = time_lists,
+              month_list_lag = month_list_lag)
     
   }else{
     
@@ -210,7 +218,8 @@ inla_data_list <- function(df,
                 int_list = int_list,
                 month_list = month_list,
                 offset_list = offset_list,
-                id_list = id_list)  
+                id_list = id_list,
+                month_list_lag = month_list_lag)  
     
     
     
@@ -220,4 +229,24 @@ out
   
 }
 
+
+# hospital outcomes create ---------
+
+hosp_outcome_create <- function(df){
+  df$hosp_zero <- ifelse(df$hosp_yes ==0,1,df$hosp_yes)
+  df$new_hosp_zero <- ifelse(df$new_hosp_total ==0, 1, df$new_hosp_total)
+  
+  df
+}
+
+# death outcomes create -----------
+
+death_outcome_create <- function(df){
+  
+  df$death_zero <- ifelse(df$death_yes ==0,1,0)
+  df$covid_death_zero <- ifelse(df$CovidDeathCount ==0,1,0)
+  df$jhu_deaths_zero <- ifelse(df$jhu_deaths ==0,1,0)
+  
+  df
+}
 
