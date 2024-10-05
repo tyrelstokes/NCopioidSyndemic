@@ -36,11 +36,11 @@ add_re <- function(init_form,
   }
   
   if(mx >1){
-    re_form <- paste("f(",
+    re_form <- paste0("f(",
                      name_re,
-                     ", model =",
-                     model,
-                     ",hyper =",
+                     ", model =\"",
+                      model,
+                     "\",hyper =",
                      prior,
                      ",constr=",
                      constr,
@@ -141,10 +141,10 @@ spat_single <- function(form = NULL,
                     i,
                     ",E",
                     i,
-                    ",copy =",
+                    ",copy = '",
                     id_base,
                     i,
-                    ",group = ",
+                    "',group = ",
                     group_base,
                     i,
                     ",hyper = list(beta = beta.prior))")
@@ -186,7 +186,7 @@ add_spatial <- function(init_form,
   start <- spat_single(form = init_form,
                        id_base = id_base,
                        spatial_model = spatial_model,
-                       group_base = 'm',
+                       group_base = group_base,
                        grouped_type = grouped_type,
                        scale_model = scale_model,
                        adjust_con = adjust_con,
@@ -235,17 +235,91 @@ add_spatial_copies <- function(init_form,
       start <- spat_single(form = start,
                            id_base = id_base,
                            spatial_model = spatial_model,
-                           group_base = group_vase,
+                           group_base = group_base,
                            grouped_type = 'ar2',
                            scale_model = T,
                            adjust_con = T,
                            copy = T,
-                           i = i)
+                           i = which_groups[i])
     }
   }
   
   start 
 }
+
+
+# add ar effect ------------
+
+add_ar <- function(init_form,
+                   prior = NULL,
+                   id_base = "m",
+                   which_ind,
+                   ar_order = 5,
+                   copy =F,
+                   copied_model = "m1"){
+  
+  if(is.null(prior)){
+    prior <- "hyper.prec"
+  }
+
+  if(copy == FALSE){
+  out <- paste0(init_form,
+                  "+f(",
+                  id_base,
+                  which_ind,
+                  ",model = 'ar', order = ",
+                  ar_order,
+                  ", adjust.for.con.comp = TRUE, hyper =",
+                  prior,
+                  ")")
+   
+  }else{
+   out <- paste0(init_form,
+                   "+f(",
+                   id_base,
+                   which_ind,
+                   ",copy ='",
+                   copied_model,
+                   "',hyper = list(beta = beta.prior))")
+    
+
+  }
+  
+  out
+  
+}
+
+
+add_ar_many <- function(init_form,
+                        prior = NULL,
+                        id_base = "m",
+                        which_inds,
+                        ar_order = 5,
+                        copy_vec,
+                        copied_model = "m1"){
+  
+ nl <- length(which_inds) 
+  
+for(i in 1:nl){
+  if(i ==1){
+    cur_form <- init_form
+  }
+  
+  cur_form <- add_ar(init_form = cur_form,
+                prior = prior,
+                id_base = id_base,
+                which_ind = which_inds[i],
+                ar_order = ar_order,
+                copy =copy_vec[i],
+                copied_model = copied_model)
+}
+  
+  
+cur_form  
+  
+}
+
+
 
 
 # Full joint formula ----------------------------------
@@ -256,10 +330,10 @@ joint_formula <- function(outcome = "y",
                           re_effects,
                           full_spatial =T,
                           lag_spatial_hosp = T,
-                          lag_spatial_deaths = T
+                          lag_spatial_deaths = T,
                           n_outcomes_cases,
                           n_outcomes_hosp,
-                          n_outcomes_deaths,
+                          n_outcomes_deaths
 ){
   
   # Start formulat
@@ -312,5 +386,95 @@ joint_formula <- function(outcome = "y",
                                      which_groups = which_hosp)
   }
   
+  if( lag_spatial_deaths == T){
+    
+    which_deaths <- c((n_outcomes_cases +n_outcomes_hosp+1):(n_outcomes_cases +n_outcomes_hosp+n_outcomes_deaths))
+    
+    init_form <- add_spatial_copies(init_form = init_form,
+                                    id_base = "idc",
+                                    group_base = "mlag",
+                                    copy = T,
+                                    which_groups = which_deaths)
+    
+    
+  }
+  
+  init_form
+  
 }
 
+
+formula_county <- function(outcome = "y",
+                           rm_int = T,
+                           fixed_effects,
+                           re_effects,
+                           lag_spatial_hosp = T,
+                           lag_spatial_deaths = T,
+                           n_outcomes_cases,
+                           n_outcomes_hosp,
+                           n_outcomes_deaths){
+  
+  
+  
+  init_form <- paste0(outcome, " ~ ")
+  
+  if(rm_int ==T){
+    init_form <-  paste0(init_form,"-1 +")
+  }
+  
+  init_form <- add_fes(init_form = init_form,
+                       new_fes = fixed_effects)
+  
+  
+  n_re <- length(re_effects)
+  init_form <- add_res_many(init_form = init_form,
+                            re_names = re_effects,
+                            prior_list = NULL,
+                            constr_vec = rep(T,n_re),
+                            model_vec = rep("iid",n_re),
+                            values_list = NULL)
+  
+  
+  nl <- sum(n_outcomes_cases,n_outcomes_hosp,n_outcomes_deaths)
+  
+  init_form <- add_ar_many(init_form = init_form,
+                           prior = NULL,
+                           id_base = "m",
+                           which_inds = c(1:nl),
+                           ar_order = 5,
+                           copy_vec = c(F,rep(T,(nl-1))),
+                           copied_model = "m1")
+  
+  if(lag_spatial_hosp == T){
+    
+    which_hosp <- c((n_outcomes_cases +1):(n_outcomes_cases +n_outcomes_hosp))
+    
+    
+    
+    init_form <- add_ar_many(init_form = init_form,
+                             prior = NULL, 
+                             id_base = "mlag",
+                             which_inds = which_hosp,
+                             copy_vec = rep(T,length(which_hosp)),
+                             copied_model = "m1")
+  }
+
+  
+  if( lag_spatial_deaths == T){
+    
+    which_deaths <- c((n_outcomes_cases +n_outcomes_hosp+1):(n_outcomes_cases +n_outcomes_hosp+n_outcomes_deaths))
+    
+    init_form <- add_ar_many(init_form = init_form,
+                             prior = NULL, 
+                             id_base = "mlag",
+                             which_inds = which_deaths,
+                             copy_vec = rep(T,length(which_deaths)),
+                             copied_model = "m1")
+    
+    
+  }  
+  
+  
+init_form  
+  
+}

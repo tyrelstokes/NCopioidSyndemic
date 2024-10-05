@@ -232,9 +232,28 @@ out
 
 # hospital outcomes create ---------
 
+binary_zero_na <- function(count_var){
+  
+  out <- ifelse(is.na(count_var),NA,
+                ifelse(count_var <0,1,
+                ifelse(count_var == 0,1,0)))
+  
+  out
+}
+
+set_neg_0 <- function(count_var){
+  ifelse(is.na(count_var)==F,
+         ifelse(count_var < 0,0,count_var),NA)
+}
+
 hosp_outcome_create <- function(df){
-  df$hosp_zero <- ifelse(df$hosp_yes ==0,1,df$hosp_yes)
-  df$new_hosp_zero <- ifelse(df$new_hosp_total ==0, 1, df$new_hosp_total)
+  
+  df$hosp_zero <- binary_zero_na(count_var = df$hosp_yes)
+  df$new_hosp_zero <- binary_zero_na(count_var = df$new_hosp_total)
+  
+  df$hosp_yes <- set_neg_0(df$hosp_yes)
+  
+  df$new_hosp_total <- set_neg_0(df$new_hosp_total)
   
   df
 }
@@ -243,9 +262,18 @@ hosp_outcome_create <- function(df){
 
 death_outcome_create <- function(df){
   
-  df$death_zero <- ifelse(df$death_yes ==0,1,0)
-  df$covid_death_zero <- ifelse(df$CovidDeathCount ==0,1,0)
-  df$jhu_deaths_zero <- ifelse(df$jhu_deaths ==0,1,0)
+  
+  df$death_zero <- binary_zero_na(count_var = df$death_yes)
+  df$covid_death_zero <- binary_zero_na(count_var = df$CovidDeathCount)
+  df$jhu_deaths_zero <- binary_zero_na(count_var = df$jhu_deaths)
+  
+  
+  df$death_yes <- set_neg_0(df$death_yes)
+  df$CovidDeathCount <- set_neg_0(df$CovidDeathCount)
+  df$jhu_deaths <- set_neg_0(df$jhu_deaths)
+  
+  
+  
   
   df
 }

@@ -94,3 +94,9 @@ e_hier_2 <- run_heir(model = "exp",
 
 write.csv(e_hier_2,here::here("growth-files/exp_hier.csv"))
 
+
+# Extension ideas
+# It might make more sense to have the information sharing operate with respect to an adjacency matrix
+# or perhaps just regionally which would be easier to implement.
+# look into the regional classification!!! That would probably work.
+

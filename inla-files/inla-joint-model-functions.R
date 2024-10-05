@@ -10,407 +10,134 @@ source(here::here("inla-files/inla-create-all-variables.R"))
 source(here::here("inla-files/inla-prediction-funs.R"))
 source(here::here("usa_adj_mat_files/adj-mat-functions.R"))
 source(here::here("utilities/date-functions.R"))
+source(here::here("inla-files/joint-helper-funs.R"))
 library(INLA)
 
+# Define some priors
 
-# Helper functions (maybe move later) --------
+U <- 1
+hyper.prec <- list(theta = list(prior = "pc.prec", param = c(U, 0.01)))
+
+beta.prior <- list(prec = list(prior = "normal", param = c(1, 1)),
+                   initial = 4, fixed = FALSE)
+
+####################3
 
 
-append_list <- function(init_list,
-                        outcome_list,
-                        offset_list,
-                        id_list,
-                        month_list,
-                        month_list_lag = NULL){
-
-if(is.null(init_list) ==FALSE){
-  outl <- init_list$outcome_list
-  offl <- init_list$offset_list
-  idl <- init_list$id_list
-  ml <- init_list$month_list
-
+get_fe_vec <- function(ind_intercept = T,
+                       mar = T,
+                       vac = T,
+                       n_outcomes_cases,
+                       n_outcomes_hosp,
+                       n_outcomes_deaths){
   
-  
- np_old <- length(outl)
- np_new <- length(outcome_list)
- 
- np <- np_old + np_new
-   
-outcome_list <- append(outl,outcome_list)  
-offset_list <- append(offl,offset_list) 
-id_list <- append(idl,id_list)
-month_list <- append(ml, month_list)
-
-if(is.null(month_list_lag) ==F){
-mll <- init_list$month_list_lag
-
-month_list_lag <- append(mll,month_list_lag)
-}
-
-}else{
-  np <- length(outcome_list)
-}
-
-out <- list(outcome_list = outcome_list,
-            offset_list = offset_list,
-            id_list = id_list,
-            month_list = month_list,
-            month_list_lag = month_list_lag,
-            np = np)
-
-out
-  
-  
-}  
+  n_t <- sum(n_outcomes_cases,n_outcomes_hosp,n_outcomes_deaths)
   
 
-
-# Joint Model functions at the county level --------------
-
-
-
-
-
-case_prep <- function(df,
-                      n,
-                      jhu_zeros = T,
-                      init_list = NULL){
   
-  if(jhu_zeros == T){
-    np <- 3
-    outcome_list <- list(df$cases,
-                         df$jhu_zero,
-                         df$jhu_cases)
-    
-    offset_list <- rep_vector(np = np,
-                              x = df$population_scale)
-    
-    id_list <- rep_vector(np = np,
-                          x = df$remapped_id)
-    
-    month_list <- rep_vector(np = np,
-                             x = df$month_id)
+  if(ind_intercept == T){
+    out <- paste0("int",c(1:n_t))
   }else{
-    np <- 2
-    outcome_list <- list(df$cases,
-                         df$jhu_cases)
-    
-    offset_list <- rep_vector(np = np,
-                              x = df$population_scale)
-    
-    id_list <- rep_vector(np = np,
-                          x = df$remapped_id)
-    
-    month_list <- rep_vector(np = np,
-                             x = df$month_id)
-    
+    out <- NULL
   }
   
+  if(mar == T){
+    out <- c(out,paste0("mar",c(1:n_t)))
+  }
   
- out <-  append_list(init_list = init_list,
-                     outcome_list = outcome_list,
-                     offset_list = offset_list,
-                     id_list = id_list,
-                     month_list = month_list)
- 
- out
-   
+  if(vac == T){
+    out <- c(out,paste0("vac",c(1:n_t)))
+  }
+  
+  out <- out[is.null(out)==F]
+  
+  out
+  
 }
 
 
-####### Hospitalization prep
 
-gen_prep <- function(df,
-                     n,
-                     out_names,
-                     init_list = NULL){
+
+valid_zeros <- function(df,
+                        out_names,
+                        out_likelihoods,
+                        thres = 0.075){
   
   out_cols <- df %>% dplyr::select(dplyr::all_of(out_names))
- 
-  outcome_list <- as.list(out_cols)
   
-  np <- ncol(out_cols)
-  
-  offset_list <- rep_vector(np = np,
-                            x = df$population_scale)
-  
-  id_list <- rep_vector(np = np,
-                        x = df$remapped_id)
-  
-  month_list <- rep_vector(np = np,
-                           x = df$month_id)
-  
-  
-  month_list_lag <- rep_vector(np = np,
-                               x = ifelse(df$month_id > 1,df$month_id - 1,NA))
- 
-  
-  
-  out <-  append_list(init_list = init_list,
-                      outcome_list = outcome_list,
-                      offset_list = offset_list,
-                      id_list = id_list,
-                      month_list = month_list,
-                      month_list_lag = month_list_lag)
-  
-  out
-  
-}
-
-
-###### outcome vec append ------------------
-
-append_vec <- function(init_vec = NULL,
-                       new_vec){
-  
-  if(is.null(init_vec) == TRUE){
-    out <- new_vec
-  }else{
-    out <- c(init_vec,new_vec)
-  }
-  out
-}
-
-# append list gen function ------------
-append_list_gen <- function(initial_list = NULL,
-                            new_list,
-                            new_names){
- 
-  if(is.null(initial_list)==FALSE){
-    w <- length(new_list)
-    
-    out <- foreach::foreach(i =1:w)%do%{
-      nl <- list(new_list[[i]])
-      names(nl) <- new_names[i]
-      
-      initial_list <- append(initial_list,nl)
-    }
-    
-  }else{
-    out <- new_list
-    names(out) <- new_names
-  }
- out 
-   
-}
-
-# append list 2
-
-append_list_2 <- function(initial_list = NULL,
-                          new_list,
-                          new_names){
-
-  
-  if(is.null(initial_list)==FALSE){
-    l_old <- length(initial_list)
-    nms_old <- names(initial_list)
-    w <- length(new_list)
-    
-    J <- l_old + w
-    
-    out <- foreach::foreach(i =1:J)%do%{
-      
-      if(i <= l_old){
-        x <- initial_list[[i]]
-      }else{
-        x <-  new_list[[(i-l_old)]]
-      }
-      
-      x
-  
-    }
-    
-    names(out) <- c(nms_old,new_names)
-    
-  }else{
-    out <- new_list
-    names(out) <- new_names
-  }
-  out 
-  
-  
-}
-
-# link set function --------------
-
-link_set_fun <- function(n,
-                         likelihood_vec){
-  
-  
-  p <- length(likelihood_vec)
-  
-out <- unlist(lapply(c(1:p),function(i){
-  rep(i,n)
-}))
-  
- out 
-  
-}
-
-
-create_re_intercept <- function(total_vars,
-                                n,
-                                which_vars,
-                                var_name){
-  
-  int_count <- 1
-  
-  x_list <- foreach::foreach(i =1:total_vars,.combine = c)%do%{
-    
-   if(which_vars[i]== 1){
-     out <- rep(int_count,n)
-     int_count = int_count + 1
+ zvec <-  apply(out_cols,2,function(x){
+   x <-  mean(x >0, na.rm =T)
+   if(x >= thres){
+     out <- F
    }else{
-     out <- rep(NA,n)
+     out <- T
    }
-   out 
-  }
+   out
+  })
+ 
+
+
+if(sum(zvec)>0){
+  output_names <- out_names[!zvec]
+  output_likelihoods <- out_likelihoods[!zvec]
   
   
-  
- # inla_vectors(n = n,
-  #             np = total_vars,
-   #            x_list = x_list,
-    #           base_name = var_name)
-  
-  x_list
+}else{
+  output_names <- out_names
+  output_likelihoods <- out_likelihoods
 }
-
-
-
-outcome_type_intercept <- function(cases_outcomes,
-                                   hosp_outcomes,
-                                   deaths_outcomes,
-                                   cases_likelihoods,
-                                   hosp_likelihoods,
-                                   deaths_likelihoods){
   
-  
-  all_outcomes <- c(cases_outcomes,hosp_outcomes,deaths_outcomes)
-  
-  c_l <- length(cases_outcomes)
-  
-  wc <-  grepl("zero",cases_outcomes)
-  
-  c_l_z <- sum(wc)
-  c_l_p <- c_l - c_l_z
-  
-  hc <-  grepl("zero",hosp_outcomes)
-  
-  h_l <- length(hosp_outcomes)
-  h_l_z <- sum(hc)
-  h_l_p <- h_l - h_l_z
-  
-  dc <- grepl("zero", deaths_outcomes)
-  
-  d_l <- length(deaths_outcomes)
-  d_l_z <- sum(dc)
-  d_l_p <- d_l - d_l_z
-  
-  
-  n_total <- sum(c_l,h_l,d_l)
-  
-  cs <- c(1:c_l)
-  hs <- c((c_l+1):(c_l+h_l))
-  ds <- c((c_l+h_l+1):n_total)
-  
-  w_cz <- rep(0,n_total)
-  w_cz[cs][wc] <- rep(1,sum(wc == T))
-  w_cp <- rep(0,n_total)
-  w_cp[cs][!wc] <- rep(1,sum(wc == F))
-  
-  
-  w_hz <- rep(0,n_total)
-  w_hz[hs][hc] <- rep(1,sum(hc == T))
-  w_hp <- rep(0,n_total)
-  w_hp[hs][!hc] <- rep(1,sum(hc == F))
-  
-  w_dz <- rep(0,n_total)
-  w_dz[ds][dc] <- rep(1,sum(dc == T))
-  w_dp <- rep(0,n_total)
-  w_dp[ds][!dc] <- rep(1,sum(dc == F))
-  
-  
-case_zero_list <-   create_re_intercept(total_vars = n_total,
-                                  n = n,
-                                  which_vars = w_cz,
-                                  var_name = "case_zero")
-
-case_poisson_list <- create_re_intercept(total_vars = n_total,
-                                         n = n,
-                                         which_vars = w_cp,
-                                         var_name = "case_poisson")
-  
-
-hosp_zero_list <-   create_re_intercept(total_vars = n_total,
-                                        n = n,
-                                        which_vars = w_hz,
-                                        var_name = "hosp_zero")
-
-hosp_poisson_list <- create_re_intercept(total_vars = n_total,
-                                         n = n,
-                                         which_vars = w_hp,
-                                         var_name = "hosp_poisson")
-
-
-death_zero_list <-   create_re_intercept(total_vars = n_total,
-                                        n = n,
-                                        which_vars = w_dz,
-                                        var_name = "death_zero")
-
-death_poisson_list <- create_re_intercept(total_vars = n_total,
-                                         n = n,
-                                         which_vars = w_dp,
-                                         var_name = "death_poisson")
-
-  
-out <- list(case_zero_list = case_zero_list,
-            case_poisson_list = case_poisson_list,
-            hosp_zero_list = hosp_zero_list,
-            hosp_poisson_list = hosp_poisson_list,
-            death_zero_list = death_zero_list,
-            death_poisson_list = death_poisson_list)
-
-out
-  
-}
-
-#######
-
-
-# create copied ids
-
-copy_ids <- function(id_list,
-                     new_name = "idc"){
-  
- n_l <- length(id_list) 
-  
- names(id_list) <- paste0(new_name,c(1:n_l))
+ out <- list(output_names = output_names,
+             output_likelihoods = output_likelihoods) 
  
  out
-  
 }
 
 
-
-
-
-inla_formula_joint <- function(np,
-                         spatial = T,
-                         spatial_model = "'bym2'",
-                         grouped_effect = T,
-                         grouped_type = "'ar2'",
-                         temporal_model = "ar",
-                         order = 5,
-                         mar = T,
-                         vac = T,
-                         late = T){
+which_re_effects <- function(cases_likelihoods,
+                             hosp_likelihoods,
+                             deaths_likelihoods){
+  
+  total_res <- c("case_zeros","case_poisson","hosp_zeros","hosp_poisson","death_zeros","death_poisson")
+  out_res <- total_res
+  
+  czeros <- grepl("binomial",cases_likelihoods)
+  cpois <- !czeros
+  if(sum(czeros)<=1){
+    out_res <- out_res[-which(out_res == "case_zeros")]
+  }
+  if(sum(cpois) <= 1){
+    out_res <- out_res[-which(out_res == "case_poisson")] 
+  }
+  
+  
+  hzeros <- grepl("binomial",hosp_likelihoods)
+  hpois <- !hzeros
+  
+  if(sum(hzeros)<=1){
+    out_res <- out_res[-which(out_res == "hosp_zeros")]
+  }
+  if(sum(hpois) <= 1){
+    out_res <- out_res[-which(out_res == "hosp_poisson")] 
+  }
   
   
   
+  dzeros <- grepl("binomial",deaths_likelihoods)
+  dpois <- !dzeros
+  
+  if(sum(dzeros)<=1){
+    out_res <- out_res[-which(out_res == "death_zeros")]
+  }
+  if(sum(dpois) <= 1){
+    out_res <- out_res[-which(out_res == "death_poisson")] 
+  }
+  
+  out_res
 }
 
 
+hosp_outcomes
 
 inla_run_county_joint <- function(state_df,
                             county_fips,
@@ -427,7 +154,12 @@ inla_run_county_joint <- function(state_df,
                             hosp_outcomes = NULL,
                             hosp_likelihoods = NULL,
                             deaths_outcomes = NULL,
-                            deaths_likelihoods = NULL){
+                            deaths_likelihoods = NULL,
+                            lag_hosp = T,
+                            lag_deaths = T,
+                            ind_intercept = T,
+                            mar =T,
+                            vac = F){
   
   
   df <- state_df%>% dplyr::filter(county_fips_code == county_fips)
@@ -438,13 +170,23 @@ inla_run_county_joint <- function(state_df,
   likelihood_vec <- NULL
   
   if(is.null(cases_outcomes)==FALSE){
+    
+case_list <- valid_zeros(df = df,
+                         out_names = cases_outcomes,
+                         out_likelihoods = cases_likelihoods,
+                         thres = 0.075)
+    
+ 
+cases_outcomes_mod <- case_list$output_names
+cases_likelihoods_mod <- case_list$output_likelihoods
+    
  init_list <-  gen_prep(df = df,
                         n = n,
-                        out_names = cases_outcomes,
+                        out_names = cases_outcomes_mod,
                         init_list = init_list)
  
 likelihood_vec <-  append_vec(init_vec = likelihood_vec,
-                              new_vec = cases_likelihoods)
+                              new_vec = cases_likelihoods_mod)
   
  
   }
@@ -457,13 +199,23 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
     
     }
     
+    
+    hosp_list <- valid_zeros(df = df,
+                             out_names = hosp_outcomes,
+                             out_likelihoods = hosp_likelihoods,
+                             thres = 0.075)
+    
+    
+    hosp_outcomes_mod <- hosp_list$output_names
+    hosp_likelihoods_mod <- hosp_list$output_likelihoods
+    
     init_list <-  gen_prep(df = df,
                            n = n,
-                           out_names = hosp_outcomes,
+                           out_names = hosp_outcomes_mod,
                            init_list = init_list)
     
     likelihood_vec <-  append_vec(init_vec = likelihood_vec,
-                                  new_vec = hosp_likelihoods)
+                                  new_vec = hosp_likelihoods_mod)
     
   }
   
@@ -474,13 +226,22 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
       
     }
     
+    deaths_list <- valid_zeros(df = df,
+                             out_names = deaths_outcomes,
+                             out_likelihoods = deaths_likelihoods,
+                             thres = 0.075)
+    
+    
+    deaths_outcomes_mod <- deaths_list$output_names
+    deaths_likelihoods_mod <- deaths_list$output_likelihoods
+    
     init_list <-  gen_prep(df = df,
                            n = n,
-                           out_names = deaths_outcomes,
+                           out_names = deaths_outcomes_mod,
                            init_list = init_list)
     
     likelihood_vec <-  append_vec(init_vec = likelihood_vec,
-                                  new_vec = deaths_likelihoods) 
+                                  new_vec = deaths_likelihoods_mod) 
     
     
   }
@@ -496,12 +257,12 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
 
   
   
- outcome_type_res <-   outcome_type_intercept(cases_outcomes = cases_outcomes,
-                                              hosp_outcomes = hosp_outcomes,
-                                              deaths_outcomes = deaths_outcomes,
-                                              cases_likelihoods = cases_likelihoods,
-                                              hosp_likelihoods = hosp_likelihoods,
-                                              deaths_likelihoods = deaths_likelihoods)
+ outcome_type_res <-   outcome_type_intercept(cases_outcomes = cases_outcomes_mod,
+                                              hosp_outcomes = hosp_outcomes_mod,
+                                              deaths_outcomes = deaths_outcomes_mod,
+                                              cases_likelihoods = cases_likelihoods_mod,
+                                              hosp_likelihoods = hosp_likelihoods_mod,
+                                              deaths_likelihoods = deaths_likelihoods_mod)
     
     inla_lists <-  inla_data_list(df = df,
                                   n = n,
@@ -595,33 +356,39 @@ data_list <- append_list_2(initial_list = data_list,
 data_list <- append_list_2(initial_list = data_list,
                            new_list = idc_list,
                            new_names = paste0("idc",c(1:nl)))
+
+
+n_outcomes_cases <- length(cases_outcomes_mod)
+n_outcomes_hosp <- length(hosp_outcomes_mod)
+n_outcomes_deaths <- length(deaths_outcomes_mod)
+
+fe_vec <- get_fe_vec(ind_intercept = ind_intercept,
+                     mar = mar,
+                     vac = vac,
+                     n_outcomes_cases = n_outcomes_cases,
+                     n_outcomes_hosp = n_outcomes_hosp,
+                     n_outcomes_deaths = n_outcomes_deaths)
+
+
+re_effects <- which_re_effects(cases_likelihoods = cases_likelihoods_mod,
+                              hosp_likelihoods = hosp_likelihoods_mod,
+                              deaths_likelihoods = deaths_likelihoods_mod)
+
+in_form <- formula_county(outcome = "y",
+                          rm_int = T,
+                          fixed_effects = fe_vec,
+                          re_effects = re_effects,
+                          lag_spatial_hosp = lag_hosp,
+                          lag_spatial_deaths = lag_deaths,
+                          n_outcomes_cases = n_outcomes_cases,
+                          n_outcomes_hosp = n_outcomes_hosp,
+                          n_outcomes_deaths = n_outcomes_deaths)
     
    
       
-      test_mod <- INLA::inla(y ~ -1+ int1 + int2+
-                               mar1 + mar2 +
-                               vac1 + vac2 +
-                               f(m1,
-                                 model= "ar",
-                                 order = order,
-                                 adjust.for.con.comp = TRUE,
-                                 hyper = hyper.prec)+
-                               f(m2,
-                                 copy = "m1",
-                                 #group = m2,
-                                 hyper = list(beta = beta.prior)),
-                             family=c("poisson","zeroinflatedpoisson0"),
-                             data=list(y =y,
-                                       E1 = E1,
-                                       E2 = E2,
-                                       int1 = int1,
-                                       int2 = int2,
-                                       id1 = id1,
-                                       id2 = id2,
-                                       mar1 = mar1,
-                                       mar2 = mar2,
-                                       vac1 = vac1,
-                                       vac2 = vac2),
+      test_mod <- INLA::inla(as.formula(in_form),
+                             family=c(cases_likelihoods_mod,hosp_likelihoods_mod,deaths_likelihoods_mod),
+                             data=data_list,
                              control.compute=list(waic=TRUE),
                              control.predictor = list(compute = TRUE,
                                                       link = link_set),
@@ -631,7 +398,7 @@ data_list <- append_list_2(initial_list = data_list,
                              verbose = verbose)
       
       
-      predictions <- inla_predict(inla_mod = test_mod,
+      ypredictions <- inla_predict(inla_mod = test_mod,
                                   n = n,
                                   np = np,
                                   df = df)
@@ -697,16 +464,16 @@ data_list <- append_list_2(initial_list = data_list,
       
     }
     
-  }else{
-    out <- list(df = df,
-                preds = NULL,
-                inla_mod = NULL)
-  }
+#  }else{
+ #   out <- list(df = df,
+  #              preds = NULL,
+   #             inla_mod = NULL)
+#  }
   
-  out <- list(df = df,
-              preds = preds,
+ # out <- list(df = df,
+  #            preds = preds,
               inla_mod = test_mod)
   
-  out
+#  out
   
-}
+#}
