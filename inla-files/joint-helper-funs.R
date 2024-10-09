@@ -424,7 +424,7 @@ copy_ids <- function(id_list,
   
   names(id_list) <- paste0(new_name,c(1:n_l))
   
-  out
+  id_list
   
 }
 
