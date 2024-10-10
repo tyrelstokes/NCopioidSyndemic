@@ -418,11 +418,26 @@ outcome_type_intercept <- function(cases_outcomes,
 # create copied ids
 
 copy_ids <- function(id_list,
-                     new_name = "idc"){
+                     new_name = "idc",
+                     group_id_list = NULL){
   
   n_l <- length(id_list) 
   
   names(id_list) <- paste0(new_name,c(1:n_l))
+  
+
+  
+  if(is.null(group_id_list)==F){
+  
+  for(i in 1:n_l){
+    curid <- id_list[[i]]
+    curgr <- group_id_list[[i]]
+    out_id <- ifelse(is.na(curgr),NA,curid)
+    id_list[[i]] <- out_id
+  }
+    
+    
+  }
   
   id_list
   
@@ -431,18 +446,3 @@ copy_ids <- function(id_list,
 
 
 
-
-inla_formula_joint <- function(np,
-                               spatial = T,
-                               spatial_model = "'bym2'",
-                               grouped_effect = T,
-                               grouped_type = "'ar2'",
-                               temporal_model = "ar",
-                               order = 5,
-                               mar = T,
-                               vac = T,
-                               late = T){
-  
-  return(NULL)
-  
-}

@@ -35,7 +35,7 @@ ny$population <- plyr::mapvalues(ny$county_fips_code,
                                  from = pop$fips_num,
                                  to = pop$est_july_2020)
 
-ny$population_scale <- ny$population/(median(ny$cases,na.rm = T)*50)
+ny$population_scale <- ny$population/(median(ny$cases,na.rm = T)*500)
 
 
 # Convert the dates to numeric 1:n_months --------
@@ -101,6 +101,9 @@ hosp_likelihoods = c("zeroinflatedpoisson0","binomial","zeroinflatedpoisson0","b
 deaths_outcomes = c("death_yes","death_zero","CovidDeathCount","covid_death_zero","jhu_deaths","jhu_deaths_zero")
 deaths_likelihoods = c("zeroinflatedpoisson0","binomial","zeroinflatedpoisson0","binomial","zeroinflatedpoisson0","binomial")
 
+cases_group <- c(1,2,2)
+hosp_group <- c(1,1,2,2)
+deaths_group <- c(1,1,2,2,3,3)
 
 
 

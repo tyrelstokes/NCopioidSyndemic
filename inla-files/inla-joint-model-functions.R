@@ -22,6 +22,17 @@ hyper.prec <- list(theta = list(prior = "pc.prec", param = c(U, 0.01)))
 beta.prior <- list(prec = list(prior = "normal", param = c(1, 1)),
                    initial = 4, fixed = FALSE)
 
+# Set the prior for the space and time effects
+
+h.spec <- list(rho = list(prior = 'pc.cor0', param = c(0.7, 0.5))) # time effect
+
+#hlist <- list(prec.unstruct=list(prior="loggamma",param=c(1,0.001)),  # spatial effect
+#             prec.spatial=list(prior="loggamma",param=c(1,0.001)))
+
+hlist = list(theta1 = list("PCprior", c(2, 0.01)),  
+             #  Pr(sd<1) = 0.01,# unlikely to have rr>3just based on the spatial confounding
+             theta2 = list("PCprior", c(0.5, 0.1))) 
+
 ####################3
 
 
@@ -149,7 +160,6 @@ inla_run_county_joint <- function(state_df,
                             prec_fixed = 1,
                             run = T,
                             verbose = T,
-                            hospitalizations = T,
                             cases_outcomes = NULL,
                             cases_likelihoods = NULL,
                             hosp_outcomes = NULL,
@@ -301,7 +311,8 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
     vac_list <- time_list[[2]]
     month_list_lag <- inla_lists$month_list_lag
     idc_list <- copy_ids(id_list = id_list,
-                         new_name = "idc")
+                         new_name = "idc",
+                         group_id_list = month_list_lag)
     
     
   link_set <-   link_set_fun(n = n,
@@ -468,7 +479,6 @@ inla_run_joint <-        function(df,
                                   prec_fixed = 1,
                                   run = T,
                                   verbose = T,
-                                  hospitalizations = T,
                                   cases_outcomes = NULL,
                                   cases_likelihoods = NULL,
                                   hosp_outcomes = NULL,
@@ -478,11 +488,12 @@ inla_run_joint <-        function(df,
                                   cases_group = NULL,
                                   hosp_group = NULL,
                                   deaths_group = NULL,
-                                  lag_hosp = T,
-                                  lag_deaths = T,
+                                  lag_hosp = F,
+                                  lag_deaths = F,
                                   ind_intercept = T,
                                   mar =T,
-                                  vac = F){
+                                  vac = F,
+                                  ar_order = 5){
   
   
   n <- nrow(df)
@@ -619,7 +630,8 @@ inla_run_joint <-        function(df,
   vac_list <- time_list[[2]]
   month_list_lag <- inla_lists$month_list_lag
   idc_list <- copy_ids(id_list = id_list,
-                       new_name = "idc")
+                       new_name = "idc",
+                       group_id_list = month_list_lag)
   
   
   link_set <-   link_set_fun(n = n,
@@ -707,7 +719,70 @@ inla_run_joint <-        function(df,
                                  hosp_likelihoods = hosp_likelihoods_mod,
                                  deaths_likelihoods = deaths_likelihoods_mod)
   
+ 
   
+in_form <-   joint_formula(outcome = "y",
+                            rm_int = T,
+                            fixed_effects = fe_vec,
+                            re_effects = re_effects,
+                            full_spatial =T,
+                            ar_order = ar_order,
+                            lag_spatial_hosp = lag_hosp,
+                            lag_spatial_deaths = lag_deaths,
+                            n_outcomes_cases = n_outcomes_cases,
+                            n_outcomes_hosp = n_outcomes_hosp,
+                            n_outcomes_deaths = n_outcomes_deaths) 
+  
+  
+  
+  ##### copied
+  
+
+
+test_mod <- INLA::inla(as.formula(in_form),
+                       family=c(cases_likelihoods_mod,hosp_likelihoods_mod,deaths_likelihoods_mod),
+                       data=data_list,
+                       control.compute=list(waic=TRUE),
+                       control.predictor = list(compute = TRUE,
+                                                link = link_set),
+                       control.inla=list(cmin=0),
+                       control.fixed = list(prec = prec_fixed),
+                       safe = TRUE,
+                       verbose = verbose)
+
+
+pred_list <- inla_predict_gen(inla_mod = test_mod,
+                              n = n,
+                              np = np,
+                              df = df,
+                              cases_outcomes =cases_outcomes_mod,
+                              hosp_outcomes = hosp_outcomes_mod,
+                              deaths_outcomes = deaths_outcomes_mod,
+                              cases_likelihoods = cases_likelihoods_mod,
+                              hosp_likelihoods = hosp_likelihoods_mod,
+                              deaths_likelihoods = deaths_likelihoods_mod,
+                              cases_group_mod = cases_group_mod,
+                              hosp_group_mod = hosp_group_mod,
+                              deaths_group_mod = deaths_group_mod,
+                              y = y,
+                              which_pred = "mean",
+                              month_id_vec = df$month_id,
+                              county_id_vec = df$county_fips_code)
+
+
+avg_pred_df <- pred_list$avg_pred_df
+ind_outcomes_prediction_list <- pred_list$pred_list
+grouped_by_type_prediction_list <- pred_list$grouped_list
+
+
+out <- list(avg_pred_df = avg_pred_df,
+            ind_outcomes_prediction_list = ind_outcomes_prediction_list,
+            grouped_by_type_prediction_list = grouped_by_type_prediction_list,
+            inla_mod = test_mod,
+            data_list = data_list)
+
+
+out
   
   
 }

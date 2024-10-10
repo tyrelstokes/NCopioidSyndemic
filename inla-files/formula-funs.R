@@ -109,11 +109,13 @@ spat_single <- function(form = NULL,
                         id_base,
                         group_base = 'm',
                         spatial_model = 'bym',
-                        grouped_type = 'ar2',
+                        grouped_type = 'ar',
+                        ar_order = 5,
                         scale_model = T,
                         adjust_con = T,
                         copy = F,
-                        i){
+                        i,
+                        copy_id = NULL){
   
   if(copy == F){
     inter<- paste0("f(",
@@ -121,17 +123,19 @@ spat_single <- function(form = NULL,
                    i,
                    ",E",
                    i,
-                   ",model=",
+                   ",model='",
                    spatial_model,
-                   ",graph=as.matrix(adj.mat),group =",
+                   "',graph=as.matrix(adj.mat),group =",
                    group_base,
                    i,
                    ",scale.model=",
                    scale_model,
                    ",adjust.for.con.comp = ",
                    adjust_con,
-                   ",control.group = list(model = ",
+                   ",control.group = list(model = '",
                    grouped_type,
+                   "', order = ",
+                   ar_order,
                    ",hyper = hyper.prec,scale.model = TRUE),initial = 3)")
     
   }else{
@@ -142,8 +146,7 @@ spat_single <- function(form = NULL,
                     ",E",
                     i,
                     ",copy = '",
-                    id_base,
-                    i,
+                    copy_id,
                     "',group = ",
                     group_base,
                     i,
@@ -178,7 +181,8 @@ add_spatial <- function(init_form,
                         spatial_model = 'bym',
                         group_base = 'm',
                         n_groups,
-                        grouped_type = 'ar2',
+                        grouped_type = 'ar',
+                        ar_order = 5,
                         scale_model = T,
                         adjust_con = T){
   
@@ -191,19 +195,22 @@ add_spatial <- function(init_form,
                        scale_model = scale_model,
                        adjust_con = adjust_con,
                        copy = F,
-                       i = 1)
+                       i = 1,
+                       ar_order = ar_order)
   
   
   for(i in 2:n_groups){
     start <- spat_single(form = start,
                          id_base = id_base,
                          spatial_model = spatial_model,
-                         group_base = 'm',
+                         group_base = group_base,
                          grouped_type = grouped_type,
                          scale_model = scale_model,
                          adjust_con = adjust_con,
                          copy = T,
-                         i = i)
+                         i = i,
+                         copy_id = paste0(id_base,1),
+                         ar_order = ar_order)
   }
   
   start
@@ -216,11 +223,12 @@ add_spatial_copies <- function(init_form,
                                id_base,
                                group_base,
                                copy = T,
-                               which_groups){
+                               which_groups,
+                               copy_id = "id1"){
   
   n_groups <- length(which_groups)
   
-  start <- spat_single(form = start,
+  start <- spat_single(form = init_form,
                        id_base = id_base,
                        spatial_model = T,
                        group_base = group_base,
@@ -228,7 +236,8 @@ add_spatial_copies <- function(init_form,
                        scale_model = scale_model,
                        adjust_con = adjust_con,
                        copy = T,
-                       i = which_groups[1])
+                       i = which_groups[1],
+                       copy_id = copy_id)
   
   if(length(which_groups) >1){
     for(i in 2:n_groups){
@@ -240,7 +249,8 @@ add_spatial_copies <- function(init_form,
                            scale_model = T,
                            adjust_con = T,
                            copy = T,
-                           i = which_groups[i])
+                           i = which_groups[i],
+                           copy_id = copy_id)
     }
   }
   
@@ -333,7 +343,8 @@ joint_formula <- function(outcome = "y",
                           lag_spatial_deaths = T,
                           n_outcomes_cases,
                           n_outcomes_hosp,
-                          n_outcomes_deaths
+                          n_outcomes_deaths,
+                          ar_order = 5
 ){
   
   # Start formulat
@@ -362,10 +373,11 @@ joint_formula <- function(outcome = "y",
   
   init_form <- add_spatial(init_form = init_form,
                                        id_base = "id",
-                                       spatial_model = 'bym',
+                                       spatial_model = 'bym2',
                                        group_base = 'm',
                                        n_groups = n_groups,
-                                       grouped_type = 'ar2',
+                                       grouped_type = 'ar',
+                                       ar_order = ar_order,
                                        scale_model = T,
                                        adjust_con = T)
   
@@ -382,8 +394,9 @@ joint_formula <- function(outcome = "y",
     init_form <- add_spatial_copies(init_form = init_form,
                                     id_base = "idc",
                                     group_base = "mlag",
-                                     copy = T,
-                                     which_groups = which_hosp)
+                                    copy = T,
+                                    which_groups = which_hosp,
+                                    copy_id = "id1")
   }
   
   if( lag_spatial_deaths == T){
@@ -394,7 +407,8 @@ joint_formula <- function(outcome = "y",
                                     id_base = "idc",
                                     group_base = "mlag",
                                     copy = T,
-                                    which_groups = which_deaths)
+                                    which_groups = which_deaths,
+                                    copy_id = "id1")
     
     
   }
