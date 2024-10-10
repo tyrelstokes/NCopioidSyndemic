@@ -173,7 +173,8 @@ inla_run_county_joint <- function(state_df,
                             lag_deaths = T,
                             ind_intercept = T,
                             mar =T,
-                            vac = F){
+                            vac = F,
+                            thres = 0.03){
   
   
   df <- state_df%>% dplyr::filter(county_fips_code == county_fips)
@@ -188,7 +189,7 @@ inla_run_county_joint <- function(state_df,
 case_list <- valid_zeros(df = df,
                          out_names = cases_outcomes,
                          out_likelihoods = cases_likelihoods,
-                         thres = 0.075)
+                         thres = thres)
     
  
 cases_outcomes_mod <- case_list$output_names
@@ -220,7 +221,7 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
     hosp_list <- valid_zeros(df = df,
                              out_names = hosp_outcomes,
                              out_likelihoods = hosp_likelihoods,
-                             thres = 0.075)
+                             thres = thres)
     
     
     hosp_outcomes_mod <- hosp_list$output_names
@@ -250,7 +251,7 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
     deaths_list <- valid_zeros(df = df,
                              out_names = deaths_outcomes,
                              out_likelihoods = deaths_likelihoods,
-                             thres = 0.075)
+                             thres = thres)
     
     
     deaths_outcomes_mod <- deaths_list$output_names
@@ -493,7 +494,8 @@ inla_run_joint <-        function(df,
                                   ind_intercept = T,
                                   mar =T,
                                   vac = F,
-                                  ar_order = 5){
+                                  ar_order = 5,
+                                  thres = 0.03){
   
   
   n <- nrow(df)
@@ -507,7 +509,7 @@ inla_run_joint <-        function(df,
     case_list <- valid_zeros(df = df,
                              out_names = cases_outcomes,
                              out_likelihoods = cases_likelihoods,
-                             thres = 0.075)
+                             thres = thres)
     
     
     cases_outcomes_mod <- case_list$output_names
@@ -539,7 +541,7 @@ inla_run_joint <-        function(df,
     hosp_list <- valid_zeros(df = df,
                              out_names = hosp_outcomes,
                              out_likelihoods = hosp_likelihoods,
-                             thres = 0.075)
+                             thres = thres)
     
     
     hosp_outcomes_mod <- hosp_list$output_names
@@ -569,7 +571,7 @@ inla_run_joint <-        function(df,
     deaths_list <- valid_zeros(df = df,
                                out_names = deaths_outcomes,
                                out_likelihoods = deaths_likelihoods,
-                               thres = 0.075)
+                               thres = thres)
     
     
     deaths_outcomes_mod <- deaths_list$output_names

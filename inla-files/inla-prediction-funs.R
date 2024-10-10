@@ -400,7 +400,7 @@ inla_predict_gen <- function(inla_mod,
                               y =y)
   
   
-  
+  groups <- c(cases_group_mod,hosp_group_mod,deaths_group_mod)
   
  inter_list <-  pred_by_type(pred_list = pred_list,
                              outcome_type = outcome_type,
