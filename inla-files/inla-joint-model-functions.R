@@ -288,7 +288,8 @@ likelihood_vec <-  append_vec(init_vec = likelihood_vec,
                                               deaths_outcomes = deaths_outcomes_mod,
                                               cases_likelihoods = cases_likelihoods_mod,
                                               hosp_likelihoods = hosp_likelihoods_mod,
-                                              deaths_likelihoods = deaths_likelihoods_mod)
+                                              deaths_likelihoods = deaths_likelihoods_mod,
+                                              n=n)
     
     inla_lists <-  inla_data_list(df = df,
                                   n = n,
@@ -608,7 +609,8 @@ inla_run_joint <-        function(df,
                                                deaths_outcomes = deaths_outcomes_mod,
                                                cases_likelihoods = cases_likelihoods_mod,
                                                hosp_likelihoods = hosp_likelihoods_mod,
-                                               deaths_likelihoods = deaths_likelihoods_mod)
+                                               deaths_likelihoods = deaths_likelihoods_mod,
+                                               n=n)
   
   inla_lists <-  inla_data_list(df = df,
                                 n = n,
@@ -788,3 +790,96 @@ out
   
   
 }
+
+
+
+### General impute by county model ------------
+
+
+impute_joint_county <- function(state_df,
+                                county_fips,
+                                ar_order = 5,
+                                time_intercepts = TRUE,
+                                beta.prior = beta.prior,
+                                hyper.prec = hyper.prec,
+                                prec_fixed = 1,
+                                run = T,
+                                verbose = T,
+                                cases_outcomes = NULL,
+                                cases_likelihoods = NULL,
+                                hosp_outcomes = NULL,
+                                hosp_likelihoods = NULL,
+                                deaths_outcomes = NULL,
+                                deaths_likelihoods = NULL,
+                                cases_group = NULL,
+                                hosp_group = NULL,
+                                deaths_group = NULL,
+                                lag_hosp = T,
+                                lag_deaths = T,
+                                ind_intercept = T,
+                                mar =T,
+                                vac = F,
+                                thres = 0.03,
+                                impute_month_vec = c(38:48),
+                                cases_impute,
+                                hosp_impute,
+                                deaths_impute
+){
+  
+  
+  county_model <- inla_run_county_joint(state_df = state_df,
+                                        county_fips = county_fips,
+                                        ar_order = ar_order,
+                                        time_intercepts = time_intercepts,
+                                        beta.prior = beta.prior,
+                                        hyper.prec = hyper.prec,
+                                        prec_fixed = prec_fixed,
+                                        run = run,
+                                        verbose = verbose,
+                                        cases_outcomes = cases_outcomes,
+                                        cases_likelihoods = cases_likelihoods,
+                                        hosp_outcomes = hosp_outcomes,
+                                        hosp_likelihoods = hosp_likelihoods,
+                                        deaths_outcomes = deaths_outcomes,
+                                        deaths_likelihoods = deaths_likelihoods,
+                                        cases_group = cases_group,
+                                        hosp_group = hosp_group,
+                                        deaths_group = deaths_group,
+                                        lag_hosp = lag_hosp,
+                                        lag_deaths = lag_deaths,
+                                        ind_intercept = ind_intercept,
+                                        mar =mar,
+                                        vac = vac,
+                                        thres = thres,
+                                        impute_quantity = "mean")
+  
+  
+  
+  
+  county_preds <- county_model$ind_outcomes_prediction_list
+  
+  
+  all_imputed <- c(cases_impute,hosp_impute,deaths_impute)
+  
+  n_impute <- length(all_imputed)
+  
+  
+  
+  
+  month_nas <- county_df$month_id[which(is.na(county_df$jhu_cases))]
+  
+  imputed_months <- month_nas[month_nas %in% impute_month_vec]
+  
+  
+}
+
+
+
+
+
+
+
+
+
+
+

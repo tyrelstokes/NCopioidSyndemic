@@ -3,15 +3,30 @@ plot_state <- function(state_df,
                        random_counties = F,
                        n_sample = 5,
                        which_counties = NULL,
-                       ipsum = F){
+                       ipsum = F,
+                       imputed = F){
 
+  if(imputed ==F){
+  mvs <-  c("cases",
+            "jhu_cases",
+            "pred_cdc",
+            "avg_pred",
+            "avg")
+  
+  }else{
+    
+    mvs <- c("cases",
+             "jhu_cases",
+             "pred_cdc",
+             "avg_pred",
+             "avg",
+             "cdc_impute",
+             "jhu_impute")
+  }
+  
 pdf <- data.table::melt(data.table::setDT(state_df),id.vars = c("county_fips_code",
                                                           "month_id"),
-                                             measure.vars = c("cases",
-                                                              "jhu_cases",
-                                                              "pred_cdc",
-                                                              "avg_pred",
-                                                              "avg"))
+                                             measure.vars = mvs)
 
 
 if(random_counties == F){

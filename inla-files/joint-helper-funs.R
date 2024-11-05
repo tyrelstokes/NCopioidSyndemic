@@ -320,7 +320,8 @@ outcome_type_intercept <- function(cases_outcomes,
                                    deaths_outcomes,
                                    cases_likelihoods,
                                    hosp_likelihoods,
-                                   deaths_likelihoods){
+                                   deaths_likelihoods,
+                                   n){
   
   
   all_outcomes <- c(cases_outcomes,hosp_outcomes,deaths_outcomes)

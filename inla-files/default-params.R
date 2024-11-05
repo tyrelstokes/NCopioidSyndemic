@@ -77,6 +77,9 @@ ny <- ny %>% dplyr::arrange(case_na,
                             county_fips_code)
 
 
+
+source(here::here("inla-files/inla-create-all-variables.R"))
+
 ny <- hosp_outcome_create(ny)
 ny <- death_outcome_create(ny)
 
@@ -106,6 +109,16 @@ hosp_group <- c(1,1,2,2)
 deaths_group <- c(1,1,2,2,3,3)
 
 
+
+lag_hosp = T
+lag_deaths = T
+ind_intercept = T
+mar =T
+vac = T
+thres = 0.03
+impute_month_vec = c(38:48)
+verbose = T
+prec_fixed = 1
 
 
 
