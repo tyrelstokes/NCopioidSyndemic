@@ -35,7 +35,7 @@ ny$population <- plyr::mapvalues(ny$county_fips_code,
                                  from = pop$fips_num,
                                  to = pop$est_july_2020)
 
-ny$population_scale <- ny$population/(median(ny$cases,na.rm = T)*50)
+ny$population_scale <- ny$population/(median(ny$cases,na.rm = T)*500)
 
 
 # Convert the dates to numeric 1:n_months --------

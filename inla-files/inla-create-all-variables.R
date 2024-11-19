@@ -138,7 +138,9 @@ inla_data_list <- function(df,
                            offset_list,
                            id_list,
                            month_list,
-                           extra_time_int = TRUE){
+                           extra_time_int = TRUE,
+                           outcome_inters = NULL,
+                           month_list_lag = NULL){
   
   
   # Create INLA outcome matrix for multidimensional modelling
@@ -181,7 +183,12 @@ inla_data_list <- function(df,
   
   # create time intercepts if desired
   
-  
+  if(is.null(month_list_lag)==FALSE){
+    month_list_lag <-  inla_vectors(n = n,
+                                    np = np,
+                                    x_list = month_list_lag,
+                                    base_name = "month_lag")
+  }
   
   
   
@@ -202,7 +209,8 @@ inla_data_list <- function(df,
               month_list = month_list,
               offset_list = offset_list,
               id_list = id_list,
-              time_lists = time_lists)
+              time_lists = time_lists,
+              month_list_lag = month_list_lag)
     
   }else{
     
@@ -210,7 +218,8 @@ inla_data_list <- function(df,
                 int_list = int_list,
                 month_list = month_list,
                 offset_list = offset_list,
-                id_list = id_list)  
+                id_list = id_list,
+                month_list_lag = month_list_lag)  
     
     
     
@@ -220,4 +229,52 @@ out
   
 }
 
+
+# hospital outcomes create ---------
+
+binary_zero_na <- function(count_var){
+  
+  out <- ifelse(is.na(count_var),NA,
+                ifelse(count_var <0,1,
+                ifelse(count_var == 0,1,0)))
+  
+  out
+}
+
+set_neg_0 <- function(count_var){
+  ifelse(is.na(count_var)==F,
+         ifelse(count_var < 0,0,count_var),NA)
+}
+
+hosp_outcome_create <- function(df){
+  
+  df$hosp_zero <- binary_zero_na(count_var = df$hosp_yes)
+  df$new_hosp_zero <- binary_zero_na(count_var = df$new_hosp_total)
+  
+  df$hosp_yes <- set_neg_0(df$hosp_yes)
+  
+  df$new_hosp_total <- set_neg_0(df$new_hosp_total)
+  
+  df
+}
+
+# death outcomes create -----------
+
+death_outcome_create <- function(df){
+  
+  
+  df$death_zero <- binary_zero_na(count_var = df$death_yes)
+  df$covid_death_zero <- binary_zero_na(count_var = df$CovidDeathCount)
+  df$jhu_deaths_zero <- binary_zero_na(count_var = df$jhu_deaths)
+  
+  
+  df$death_yes <- set_neg_0(df$death_yes)
+  df$CovidDeathCount <- set_neg_0(df$CovidDeathCount)
+  df$jhu_deaths <- set_neg_0(df$jhu_deaths)
+  
+  
+  
+  
+  df
+}
 

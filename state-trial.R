@@ -49,11 +49,12 @@ pred_df <- out$df
 
 plot_ny <- plot_state(state_df = pred_df,
                       random_counties = T,
-                      n_sample = 5,
+                      n_sample = 3,
                       which_counties = NULL,
-                      ipsum = F)
+                      ipsum = T,
+                      imputed = T)
 
-plot_ny
+plot_ny + ggplot2::ggtitle("Random Sample of Counties - Predictions vs Actual")
 
 
 
@@ -115,9 +116,10 @@ pred_df_ne <- out_ne$df
 
 plot_ne <- plot_state(state_df = pred_df_ne,
                       random_counties = T,
-                      n_sample = 5,
+                      n_sample = 3,
                       which_counties = NULL,
-                      ipsum = F)
+                      ipsum = T,
+                      imputed = T)
 
 plot_ne
 
