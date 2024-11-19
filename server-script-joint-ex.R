@@ -1,3 +1,13 @@
+#!/usr/bin/env Rscript
+args = commandArgs(trailingOnly=TRUE)
+
+# args information
+# args[1] ---> name of the state data file to be found in state-data file
+# args[2] ---> Two letter state abbreviation ("NY" for example)
+# args[3] ---> scale factor (numeric for scaling thee population to avoid overflow, 500 for NY for example)
+#
+
+
 # Here is an example using the new joint modelling functions on the NY data set
 # By joint, I mean modelling of cases, hospitalizations, and counts simultaneously
 
@@ -13,7 +23,11 @@ source(here::here("inla-files/inla-joint-model-functions.R"))
 
 # Load case data ---------
 
-ny <- read.csv(here::here("state-data/NY_COVID_data.csv"))
+state_file <- paste0(here::here("state-data/",
+                                args[1],
+                                ".csv"))
+
+state_df <- read.csv(state_file)
 
 # create adj matrix ----------
 
@@ -25,27 +39,27 @@ usa_adj <- read.csv(here::here("usa_adj_mat_files/aug_adj_mat.csv"))
 
 
 ny_adj_list <-  state_adj_fun(usa_adj = usa_adj,
-                              state_abr = "NY",
+                              state_abr = args[2],
                               fips = T) 
 
 adj.mat <- ny_adj_list$state_mat
 
 # add remapped ids from 1:n_counties to the state data set ---------------
-ny <- map_adj_ids(adj_list = ny_adj_list,
-                  state_df = ny)
+state_df <- map_adj_ids(adj_list = ny_adj_list,
+                  state_df = state_df)
 
 
 # join in the population data --------------
 
 source(here::here("census-data/clean-pop-data.R")) # note this step may not work for all states, see source code for explanation
 
-ny$population <- plyr::mapvalues(ny$county_fips_code,
+state_df$population <- plyr::mapvalues(state_df$county_fips_code,
                                  from = pop$fips_num,
                                  to = pop$est_july_2020)
 
-scale_factor <- 500 # NOTE: This may have to be changed in some cases, especially state to state due to potential overflow issues
+scale_factor <- as.numeric(args[3]) # NOTE: This may have to be changed in some cases, especially state to state due to potential overflow issues
 
-ny$population_scale <- ny$population/(median(ny$cases,na.rm = T)*scale_factor)
+state_df$population_scale <- state_df$population/(median(state_df$cases,na.rm = T)*scale_factor)
 
 
 # Convert the dates to numeric 1:n_months --------
@@ -56,43 +70,44 @@ source(here::here("utilities/date-functions.R")) # load mapping function
 #ny <- ny %>% dplyr::filter(!(case_month %in% c("2020-01-01",
 # "2020-02-01")))
 
-na_df <- ny %>% dplyr::group_by(case_month) %>% dplyr::summarise(na_cases = mean(is.na(cases)),
+na_df <- state_df %>% dplyr::group_by(case_month) %>% dplyr::summarise(na_cases = mean(is.na(cases)),
                                                                  na_jhu = mean(is.na(jhu_cases)))
 
 
 nas <- which((na_df$na_cases == 1) & (na_df$na_jhu ==1) )   
-ny <- ny %>% dplyr::filter(!(case_month %in% na_df$case_month[nas]))
-ny <- map_month_ids(df = ny,
+state_df  <- state_df  %>% dplyr::filter(!(case_month %in% na_df$case_month[nas]))
+state_df  <- map_month_ids(df = state_df ,
                     beg = NULL, # default beg and end will be first and last month respectively
                     end = NULL)
 
 
 # artificially set the negative counts to 0 (Change this later) 
+# This may need to be adapted for other data sets
 
-ny$jhu_cases_reset <- ifelse(ny$jhu_cases < 0, 0,ny$jhu_cases)
-ny$jhu_zero <- ifelse(ny$jhu_cases_reset ==0,1,ifelse(is.na(ny$jhu_cases),NA,0))
+state_df$jhu_cases_reset <- ifelse(state_df$jhu_cases < 0, 0,state_df$jhu_cases)
+state_df$jhu_zero <- ifelse(state_df$jhu_cases_reset ==0,1,ifelse(is.na(state_df$jhu_cases),NA,0))
 
-ny$jhu_cases <- ifelse(is.na(ny$jhu_cases),NA,ny$jhu_cases_reset)
+state_df$jhu_cases <- ifelse(is.na(state_df$jhu_cases),NA,state_df$jhu_cases_reset)
 
 
 
 
 # order the dataframe to avoid NA issues in the predict step
 
-ny  <- ny %>% dplyr::mutate(case_na = ifelse(is.na(cases),1,0),
+state_df  <- state_df %>% dplyr::mutate(case_na = ifelse(is.na(cases),1,0),
                             jhu_na = ifelse(is.na(jhu_cases),1,0))
 
-ny <- ny %>% dplyr::arrange(case_na,
+state_df <- state_df %>% dplyr::arrange(case_na,
                             jhu_na,
                             county_fips_code)
 
 
-ny <- hosp_outcome_create(ny) # This creates additional variables
-ny <- death_outcome_create(ny)
+state_df <- hosp_outcome_create(state_df) # This creates additional variables
+state_df <- death_outcome_create(state_df)
 
 # Create the state dataframe -----------
 
-state_df <- ny
+#state_df <- ny
 
 #county_fips <- 36005
 
@@ -137,8 +152,8 @@ ar_order <- 5 # what order should the ar process be?
 
 ## subset for testing?
 
-testing <- F
-n_test <- 5
+testing <- args[4]
+n_test <- args[5]
 
 if(testing == T){
   eff_counties <- head(unique(state_df$county_fips_code),n_test)
@@ -175,37 +190,3 @@ model_output <- inla_run_joint(df = df_eff,
                                mar = mar,
                                vac = vac,
                                ar_order = ar_order)
-
-
-
-nm <- "ny_bym2"
-dta <- "nov18"
-
-comb_nm <- paste0(nm,"_",dta)
-
-beg <- paste0(here::here("inla-files/model-results/"),
-              comb_nm)
-
-avg_pred_df <- model_output$avg_pred_df
-write.csv(avg_pred_df,paste0(beg,
-                             "avg_pred_df",
-                             ".csv"))
-
-ind_outcomes_prediction_list <- model_output$ind_outcomes_prediction_list
-saveRDS(ind_outcomes_prediction_list,
-        paste0(beg,
-               "_ind_outcomes.Rda"))
-
-grouped_by_type_prediction_list <- model_output$grouped_by_type_prediction_list
-saveRDS(ind_outcomes_prediction_list,
-        paste0(beg,
-               "_grouped_outcomes.Rda"))
-
-
-saveRDS(model_output,
-        paste0(beg,
-               "_full_results.Rda"))
-
-
-
-

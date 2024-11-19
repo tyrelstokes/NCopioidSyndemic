@@ -29,6 +29,12 @@ index_finder <- function(n,
 
 # Create INLA vectors with appropriate NAs -----------
 
+#' @export 
+#' @param n the length of the data frame in wide format
+#' @param np the number of jointly modelled outcomes
+#' @param x_list a list of the individual vectors to be transformed. Each vector needs to be of length n and the list of vectors must be length np
+#' @param base_name if the vectors are related to one another, the basename is a descriptor describing them
+#' @return a list containing the transformed vectors with the appropriate NAs added
 inla_vectors <- function(n,
                         np,
                         x_list,

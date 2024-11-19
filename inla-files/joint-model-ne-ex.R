@@ -13,7 +13,7 @@ source(here::here("inla-files/inla-joint-model-functions.R"))
 
 # Load case data ---------
 
-ny <- read.csv(here::here("state-data/NY_COVID_data.csv"))
+ne <- read.csv(here::here("state-data/NE_COVID_data.csv"))
 
 # create adj matrix ----------
 
@@ -24,28 +24,28 @@ source(here::here("usa_adj_mat_files/adj-mat-functions.R"))
 usa_adj <- read.csv(here::here("usa_adj_mat_files/aug_adj_mat.csv"))
 
 
-ny_adj_list <-  state_adj_fun(usa_adj = usa_adj,
-                              state_abr = "NY",
+ne_adj_list <-  state_adj_fun(usa_adj = usa_adj,
+                              state_abr = "NE",
                               fips = T) 
 
-adj.mat <- ny_adj_list$state_mat
+adj.mat <- ne_adj_list$state_mat
 
 # add remapped ids from 1:n_counties to the state data set ---------------
-ny <- map_adj_ids(adj_list = ny_adj_list,
-                  state_df = ny)
+ne <- map_adj_ids(adj_list = ne_adj_list,
+                  state_df = ne)
 
 
 # join in the population data --------------
 
 source(here::here("census-data/clean-pop-data.R")) # note this step may not work for all states, see source code for explanation
 
-ny$population <- plyr::mapvalues(ny$county_fips_code,
+ne$population <- plyr::mapvalues(ne$county_fips_code,
                                  from = pop$fips_num,
                                  to = pop$est_july_2020)
 
-scale_factor <- 500 # NOTE: This may have to be changed in some cases, especially state to state due to potential overflow issues
+scale_factor <- 150 # NOTE: This may have to be changed in some cases, especially state to state due to potential overflow issues
 
-ny$population_scale <- ny$population/(median(ny$cases,na.rm = T)*scale_factor)
+ne$population_scale <- ne$population/(median(ne$cases,na.rm = T)*scale_factor)
 
 
 # Convert the dates to numeric 1:n_months --------
@@ -56,43 +56,43 @@ source(here::here("utilities/date-functions.R")) # load mapping function
 #ny <- ny %>% dplyr::filter(!(case_month %in% c("2020-01-01",
 # "2020-02-01")))
 
-na_df <- ny %>% dplyr::group_by(case_month) %>% dplyr::summarise(na_cases = mean(is.na(cases)),
+na_df <- ne %>% dplyr::group_by(case_month) %>% dplyr::summarise(na_cases = mean(is.na(cases)),
                                                                  na_jhu = mean(is.na(jhu_cases)))
 
 
 nas <- which((na_df$na_cases == 1) & (na_df$na_jhu ==1) )   
-ny <- ny %>% dplyr::filter(!(case_month %in% na_df$case_month[nas]))
-ny <- map_month_ids(df = ny,
+ne <- ne %>% dplyr::filter(!(case_month %in% na_df$case_month[nas]))
+ne <- map_month_ids(df = ne,
                     beg = NULL, # default beg and end will be first and last month respectively
                     end = NULL)
 
 
 # artificially set the negative counts to 0 (Change this later) 
 
-ny$jhu_cases_reset <- ifelse(ny$jhu_cases < 0, 0,ny$jhu_cases)
-ny$jhu_zero <- ifelse(ny$jhu_cases_reset ==0,1,ifelse(is.na(ny$jhu_cases),NA,0))
+ne$jhu_cases_reset <- ifelse(ne$jhu_cases < 0, 0,ne$jhu_cases)
+ne$jhu_zero <- ifelse(ne$jhu_cases_reset ==0,1,ifelse(is.na(ne$jhu_cases),NA,0))
 
-ny$jhu_cases <- ifelse(is.na(ny$jhu_cases),NA,ny$jhu_cases_reset)
+ne$jhu_cases <- ifelse(is.na(ne$jhu_cases),NA,ne$jhu_cases_reset)
 
 
 
 
 # order the dataframe to avoid NA issues in the predict step
 
-ny  <- ny %>% dplyr::mutate(case_na = ifelse(is.na(cases),1,0),
+ne  <- ne %>% dplyr::mutate(case_na = ifelse(is.na(cases),1,0),
                             jhu_na = ifelse(is.na(jhu_cases),1,0))
 
-ny <- ny %>% dplyr::arrange(case_na,
+ne <- ne %>% dplyr::arrange(case_na,
                             jhu_na,
                             county_fips_code)
 
 
-ny <- hosp_outcome_create(ny) # This creates additional variables
-ny <- death_outcome_create(ny)
+ne <- hosp_outcome_create(ne) # This creates additional variables
+ne <- death_outcome_create(ne)
 
 # Create the state dataframe -----------
 
-state_df <- ny
+state_df <- ne
 
 #county_fips <- 36005
 
@@ -178,7 +178,7 @@ model_output <- inla_run_joint(df = df_eff,
 
 
 
-nm <- "ny_bym2"
+nm <- "ne_bym2"
 dta <- "nov18"
 
 comb_nm <- paste0(nm,"_",dta)
@@ -205,7 +205,3 @@ saveRDS(ind_outcomes_prediction_list,
 saveRDS(model_output,
         paste0(beg,
                "_full_results.Rda"))
-
-
-
-
